@@ -1,0 +1,139 @@
+{
+  "name": "gym-management",
+  "version": "1.0.0",
+  "description": "xgym systam",
+  "private": true,
+  "main": "electron/main.js",
+  "author": " Amr Anter",
+  "scripts": {
+    "dev": "next dev -p 4001",
+    "build": "next build",
+    "build:standalone": "prisma generate && next build && npm run copy-standalone",
+    "copy-standalone": "node scripts/prepare-standalone.js",
+    "start": "next start -p 4001",
+    "electron": "electron .",
+    "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:4001 && electron .\"",
+    "prebuild:win": "prisma generate && npm run build:standalone",
+    "build:win": "electron-builder --win --x64",
+    "dist": "npm run build:standalone && electron-builder --win",
+    "dist:win": "npm run build:standalone && electron-builder --win --x64",
+    "postinstall": "prisma generate && electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "com.gym.management",
+    "productName": "X Gym Management System",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      ".next/standalone/**/*",
+      ".next/static/**/*",
+      "public/**/*",
+      "prisma/**/*",
+      "package.json",
+      "next.config.js",
+      "node_modules/electron-is-dev/**/*",
+      "node_modules/next/**/*",
+      "node_modules/@next/**/*",
+      "!node_modules/electron/**/*",
+      "!dist/**/*",
+      "!.next/cache/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/next",
+        "to": "app.asar.unpacked/node_modules/next"
+      },
+      {
+        "from": "node_modules/.prisma",
+        "to": "app.asar.unpacked/node_modules/.prisma"
+      },
+      {
+        "from": "node_modules/@prisma",
+        "to": "app.asar.unpacked/node_modules/@prisma"
+      },
+      {
+        "from": "prisma",
+        "to": "prisma"
+      },
+      {
+        "from": "public",
+        "to": "public"
+      },
+      {
+        "from": ".next/static",
+        "to": "static"
+      }
+    ],
+    "asar": {
+      "smartUnpack": true
+    },
+    "asarUnpack": [
+      ".next/standalone/**/*",
+      "node_modules/sharp/**/*",
+      "node_modules/@prisma/**/*",
+      "node_modules/.prisma/**/*",
+      "prisma/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "publisherName": "X Gym System",
+      "requestedExecutionLevel": "requireAdministrator"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": " X Gym",
+      "uninstallDisplayName": "Gym Management System",
+      "artifactName": "GymSystem-Setup-${version}.exe",
+      "deleteAppDataOnUninstall": false,
+      "language": "1025",
+      "multiLanguageInstaller": false,
+      "menuCategory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "runAfterFinish": true
+    }
+  },
+  "dependencies": {
+    "@next/env": "^16.0.1",
+    "@prisma/client": "^5.22.0",
+    "@swc/helpers": "^0.5.17",
+    "autoprefixer": "^10.4.21",
+    "client-only": "^0.0.1",
+    "electron-is-dev": "^2.0.0",
+    "exceljs": "^4.4.0",
+    "next": "^14.2.33",
+    "postcss": "^8.5.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "sharp": "^0.33.4",
+    "styled-jsx": "^5.1.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "concurrently": "^8.2.2",
+    "electron": "^39.0.0",
+    "electron-builder": "^24.9.1",
+    "prisma": "^5.22.0",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.0.0",
+    "wait-on": "^7.2.0"
+  }
+}

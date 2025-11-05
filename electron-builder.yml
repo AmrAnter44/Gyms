@@ -1,0 +1,40 @@
+appId: com.gymmanagement.app
+productName: "نظام إدارة الصالة الرياضية"
+directories:
+  output: dist
+  buildResources: build
+
+files:
+  - "**/*"
+  - "!**/*.ts"
+  - "!**/*.tsx"
+  - "!.next/cache"
+  - "!dist"
+  - "!node_modules/.cache"
+
+extraResources:
+  - from: "prisma"
+    to: "prisma"
+    filter: ["**/*"]
+  - from: "public"
+    to: "public"
+    filter: ["**/*"]
+
+win:
+  target: 
+    - target: nsis
+      arch: [x64, ia32]
+  icon: build/icon.ico
+  requestedExecutionLevel: requireAdministrator
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "نظام الجيم"
+  language: "1025"
+  installerLanguages: 
+    - ar-EG
+    - en-US
+  artifactName: "GymSystem-Setup-${version}.${ext}"

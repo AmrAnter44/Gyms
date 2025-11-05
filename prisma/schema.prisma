@@ -1,0 +1,175 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Member {
+  id                String    @id @default(cuid())
+  memberNumber      Int       @unique
+  name              String
+  phone             String
+  profileImage      String?   // ✅ إضافة حقل الصورة
+  inBodyScans       Int       @default(0)
+  invitations       Int       @default(0)
+  freePTSessions    Int       @default(0)
+  subscriptionPrice Float
+  remainingAmount   Float     @default(0)
+  notes             String?
+  isActive          Boolean   @default(true)
+  startDate         DateTime?
+  expiryDate        DateTime?
+  createdAt         DateTime  @default(now())
+  receipts          Receipt[]
+  invitationRecords Invitation[]
+}
+
+model PT {
+  ptNumber          Int         @id  // المعرف الأساسي هو ptNumber
+  clientName        String
+  phone             String
+  sessionsPurchased Int
+  sessionsRemaining Int
+  coachName         String
+  pricePerSession   Float
+  startDate         DateTime? 
+  expiryDate        DateTime? 
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  receipts          Receipt[]
+  sessions          PTSession[] // سجلات حضور الجلسات
+}
+
+// 🆕 نموذج جديد لتسجيل حضور جلسات PT
+model PTSession {
+  id            String   @id @default(cuid())
+  ptNumber      Int
+  pt            PT       @relation(fields: [ptNumber], references: [ptNumber])
+  clientName    String   // اسم العميل
+  coachName     String   // اسم المدرب
+  sessionDate   DateTime // تاريخ ووقت الجلسة
+  notes         String?  // ملاحظات
+  createdAt     DateTime @default(now())
+  
+  @@index([ptNumber])
+  @@index([sessionDate])
+}
+
+model DayUseInBody {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String
+  serviceType String   
+  price       Float
+  staffName   String
+  createdAt   DateTime @default(now())
+  receipts    Receipt[]
+}
+
+model Visitor {
+  id            String      @id @default(cuid())
+  name          String
+  phone         String      @unique
+  notes         String?
+  source        String      @default("walk-in") // walk-in, facebook, instagram, friend, other
+  interestedIn  String?     // gym, classes, personal-training, etc.
+  status        String      @default("pending") // pending, contacted, subscribed, rejected
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  
+  followUps     FollowUp[]
+  
+  @@index([status])
+  @@index([createdAt])
+  @@index([phone])
+}
+
+// 🆕 نموذج جديد لمتابعة الزوار
+model FollowUp {
+  id                String    @id @default(cuid())
+  visitorId         String
+  visitor           Visitor   @relation(fields: [visitorId], references: [id], onDelete: Cascade)
+  notes             String
+  contacted         Boolean   @default(false)
+  nextFollowUpDate  DateTime?
+  result            String?   // interested, not-interested, postponed, subscribed
+  salesName         String?   // 🆕 اسم البائع الذي قام بالمتابعة
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@index([visitorId])
+  @@index([nextFollowUpDate])
+  @@index([contacted])
+}
+
+model Receipt {
+  id            String        @id @default(cuid())
+  receiptNumber Int           @unique
+  type          String        
+  amount        Float
+  itemDetails   String        
+  paymentMethod String        @default("cash") 
+  createdAt     DateTime      @default(now())
+  
+  memberId      String?
+  member        Member?       @relation(fields: [memberId], references: [id])
+  
+  ptNumber      Int?          // تغيير من ptId إلى ptNumber
+  pt            PT?           @relation(fields: [ptNumber], references: [ptNumber])
+  
+  dayUseId      String?
+  dayUse        DayUseInBody? @relation(fields: [dayUseId], references: [id])
+}
+
+model ReceiptCounter {
+  id      Int @id @default(1)
+  current Int @default(1000)
+}
+
+model MemberCounter {
+  id      Int @id @default(1)
+  current Int @default(1000)
+}
+
+model Staff {
+  id        String    @id @default(cuid())
+  name      String
+  phone     String?
+  position  String?
+  salary    Float?
+  notes     String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  expenses  Expense[]
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  type        String   
+  amount      Float
+  description String
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  staffId     String?
+  staff       Staff?   @relation(fields: [staffId], references: [id])
+  isPaid      Boolean  @default(false)
+}
+
+// 🆕 نموذج جديد للدعوات
+model Invitation {
+  id          String   @id @default(cuid())
+  guestName   String   // اسم الضيف
+  guestPhone  String   // رقم هاتف الضيف
+  notes       String?  // ملاحظات
+  createdAt   DateTime @default(now())
+  
+  memberId    String   // ربط مع العضو الذي استخدم الدعوة
+  member      Member   @relation(fields: [memberId], references: [id])
+}
+

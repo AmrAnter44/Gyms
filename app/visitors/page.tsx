@@ -1,0 +1,513 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+
+interface Visitor {
+  id: string
+  name: string
+  phone: string
+  notes?: string
+  source: string
+  interestedIn?: string
+  status: string
+  createdAt: string
+  followUps?: FollowUp[]
+}
+
+interface FollowUp {
+  id: string
+  notes: string
+  contacted: boolean
+  nextFollowUpDate?: string
+  result?: string
+  salesName?: string // 🆕
+  createdAt: string
+}
+
+interface Stats {
+  status: string
+  _count: number
+}
+
+export default function VisitorsPage() {
+  const [visitors, setVisitors] = useState<Visitor[]>([])
+  const [stats, setStats] = useState<Stats[]>([])
+  const [showForm, setShowForm] = useState(false)
+  const [showFollowUpForm, setShowFollowUpForm] = useState(false)
+  const [selectedVisitor, setSelectedVisitor] = useState<Visitor | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [message, setMessage] = useState('')
+  
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    notes: '',
+    source: 'walk-in',
+    interestedIn: '',
+  })
+
+  const [followUpData, setFollowUpData] = useState({
+    notes: '',
+    contacted: false,
+    nextFollowUpDate: '',
+    result: '',
+    salesName: '', // 🆕
+  })
+
+  const fetchVisitors = async () => {
+    try {
+      const params = new URLSearchParams()
+      if (searchTerm) params.append('search', searchTerm)
+      if (statusFilter !== 'all') params.append('status', statusFilter)
+
+      const response = await fetch(`/api/visitors?${params}`)
+      const data = await response.json()
+      setVisitors(data.visitors || [])
+      setStats(data.stats || [])
+    } catch (error) {
+      console.error('Error:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchVisitors()
+  }, [searchTerm, statusFilter])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setLoading(true)
+    setMessage('')
+
+    try {
+      const response = await fetch('/api/visitors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setFormData({ name: '', phone: '', notes: '', source: 'walk-in', interestedIn: '' })
+        setMessage('✅ تم إضافة الزائر بنجاح!')
+        setTimeout(() => setMessage(''), 3000)
+        fetchVisitors()
+        setShowForm(false)
+      } else {
+        setMessage(`❌ ${data.error || 'فشل إضافة الزائر'}`)
+        setTimeout(() => setMessage(''), 5000)
+      }
+    } catch (error) {
+      console.error(error)
+      setMessage('❌ حدث خطأ')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleFollowUpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedVisitor) return
+
+    setLoading(true)
+    try {
+      const response = await fetch('/api/visitors/followups', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          visitorId: selectedVisitor.id,
+          ...followUpData,
+        }),
+      })
+
+      if (response.ok) {
+        setFollowUpData({ notes: '', contacted: false, nextFollowUpDate: '', result: '', salesName: '' })
+        setMessage('✅ تم إضافة المتابعة بنجاح!')
+        setTimeout(() => setMessage(''), 3000)
+        fetchVisitors()
+        setShowFollowUpForm(false)
+        setSelectedVisitor(null)
+      } else {
+        const data = await response.json()
+        setMessage(`❌ ${data.error || 'فشل إضافة المتابعة'}`)
+      }
+    } catch (error) {
+      console.error(error)
+      setMessage('❌ حدث خطأ')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+
+
+  const getStatusBadge = (status: string) => {
+    const badges = {
+      pending: 'bg-yellow-100 text-yellow-800',
+      contacted: 'bg-blue-100 text-blue-800',
+      subscribed: 'bg-green-100 text-green-800',
+      rejected: 'bg-red-100 text-red-800',
+    }
+    const labels = {
+      pending: 'معلق',
+      contacted: 'تم التواصل',
+      subscribed: 'مشترك',
+      rejected: 'مرفوض',
+    }
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs ${badges[status as keyof typeof badges] || 'bg-gray-100 text-gray-800'}`}>
+        {labels[status as keyof typeof labels] || status}
+      </span>
+    )
+  }
+
+  const getSourceLabel = (source: string) => {
+    const labels = {
+      'walk-in': 'زيارة مباشرة',
+      'facebook': 'فيسبوك',
+      'instagram': 'إنستجرام',
+      'friend': 'صديق',
+      'other': 'أخرى',
+    }
+    return labels[source as keyof typeof labels] || source
+  }
+
+  return (
+    <div className="container mx-auto p-6" dir="rtl">
+      {/* Header with Stats */}
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-3xl font-bold">إدارة الزوار</h1>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="bg-orange-600 text-white px-6 py-2 rounded-lg hover:bg-orange-700"
+          >
+            {showForm ? 'إخفاء النموذج' : '➕ إضافة زائر جديد'}
+          </button>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-gray-500 text-sm">إجمالي الزوار</div>
+            <div className="text-2xl font-bold">{visitors.length}</div>
+          </div>
+          {stats.map((stat) => (
+            <div key={stat.status} className="bg-white p-4 rounded-lg shadow">
+              <div className="text-gray-500 text-sm">
+                {stat.status === 'pending' && 'معلق'}
+                {stat.status === 'contacted' && 'تم التواصل'}
+                {stat.status === 'subscribed' && 'مشترك'}
+                {stat.status === 'rejected' && 'مرفوض'}
+              </div>
+              <div className="text-2xl font-bold">{stat._count}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Message Alert */}
+      {message && (
+        <div className={`mb-4 p-3 rounded-lg ${message.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          {message}
+        </div>
+      )}
+
+      {/* Add Visitor Form */}
+      {showForm && (
+        <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+          <h2 className="text-xl font-semibold mb-4">إضافة زائر جديد</h2>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">الاسم *</label>
+                <input
+                  type="text"
+                  required
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="اسم الزائر"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">رقم الهاتف *</label>
+                <input
+                  type="tel"
+                  required
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="01xxxxxxxxx"
+                  pattern="^(010|011|012|015)[0-9]{8}$"
+                  title="يجب أن يبدأ الرقم بـ 010، 011، 012، أو 015 ويتكون من 11 رقم"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">مصدر الزائر</label>
+                <select
+                  value={formData.source}
+                  onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="walk-in">زيارة مباشرة</option>
+                  <option value="facebook">فيسبوك</option>
+                  <option value="instagram">إنستجرام</option>
+                  <option value="friend">صديق</option>
+                  <option value="other">أخرى</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">مهتم بـ</label>
+                <input
+                  type="text"
+                  value={formData.interestedIn}
+                  onChange={(e) => setFormData({ ...formData, interestedIn: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="مثال: جيم، كلاسات، تدريب شخصي"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">ملاحظات</label>
+              <textarea
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                rows={3}
+                placeholder="أي ملاحظات عن الزائر..."
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-orange-600 text-white py-2 rounded-lg hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
+              {loading ? 'جاري الحفظ...' : 'إضافة زائر'}
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Follow-Up Form */}
+      {showFollowUpForm && selectedVisitor && (
+        <div className="bg-white p-6 rounded-lg shadow-md mb-6 border-2 border-blue-500">
+          <h2 className="text-xl font-semibold mb-4">
+            إضافة متابعة لـ {selectedVisitor.name}
+          </h2>
+          
+          <form onSubmit={handleFollowUpSubmit} className="space-y-4">
+            {/* 🆕 حقل اسم البائع */}
+            <div>
+              <label className="block text-sm font-medium mb-1">اسم البائع *</label>
+              <input
+                type="text"
+                required
+                value={followUpData.salesName}
+                onChange={(e) => setFollowUpData({ ...followUpData, salesName: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="من الذي قام بالمتابعة؟"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">ملاحظات المتابعة *</label>
+              <textarea
+                required
+                value={followUpData.notes}
+                onChange={(e) => setFollowUpData({ ...followUpData, notes: e.target.value })}
+                className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                rows={3}
+                placeholder="ماذا حدث في هذه المتابعة؟"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="flex items-center space-x-2 space-x-reverse">
+                  <input
+                    type="checkbox"
+                    checked={followUpData.contacted}
+                    onChange={(e) => setFollowUpData({ ...followUpData, contacted: e.target.checked })}
+                    className="rounded"
+                  />
+                  <span className="text-sm font-medium">تم التواصل</span>
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">النتيجة</label>
+                <select
+                  value={followUpData.result}
+                  onChange={(e) => setFollowUpData({ ...followUpData, result: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- اختر --</option>
+                  <option value="interested">مهتم</option>
+                  <option value="not-interested">غير مهتم</option>
+                  <option value="postponed">مؤجل</option>
+                  <option value="subscribed">اشترك</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">متابعة قادمة</label>
+                <input
+                  type="date"
+                  value={followUpData.nextFollowUpDate}
+                  onChange={(e) => setFollowUpData({ ...followUpData, nextFollowUpDate: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+              >
+                {loading ? 'جاري الحفظ...' : 'حفظ المتابعة'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFollowUpForm(false)
+                  setSelectedVisitor(null)
+                  setFollowUpData({ notes: '', contacted: false, nextFollowUpDate: '', result: '', salesName: '' })
+                }}
+                className="px-6 bg-gray-300 text-gray-700 py-2 rounded-lg hover:bg-gray-400"
+              >
+                إلغاء
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="bg-white p-4 rounded-lg shadow-md mb-6">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">بحث</label>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              placeholder="ابحث بالاسم أو رقم الهاتف..."
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">فلتر حسب الحالة</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="all">الكل</option>
+              <option value="pending">معلق</option>
+              <option value="contacted">تم التواصل</option>
+              <option value="subscribed">مشترك</option>
+              <option value="rejected">مرفوض</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Visitors Table */}
+      {loading ? (
+        <div className="text-center py-12">جاري التحميل...</div>
+      ) : (
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-4 py-3 text-right">الاسم</th>
+                <th className="px-4 py-3 text-right">رقم الهاتف</th>
+                <th className="px-4 py-3 text-right">المصدر</th>
+                <th className="px-4 py-3 text-right">مهتم بـ</th>
+                <th className="px-4 py-3 text-right">الحالة</th>
+                <th className="px-4 py-3 text-right">آخر متابعة</th>
+                <th className="px-4 py-3 text-right">تاريخ الزيارة</th>
+                <th className="px-4 py-3 text-right">إجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              {visitors.map((visitor) => (
+                <tr key={visitor.id} className="border-t hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium">{visitor.name}</td>
+                  <td className="px-4 py-3 font-mono text-sm">{visitor.phone}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {getSourceLabel(visitor.source)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {visitor.interestedIn || '-'}
+                  </td>
+                  <td className="px-4 py-3">{getStatusBadge(visitor.status)}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {visitor.followUps && visitor.followUps.length > 0 ? (
+                      <div className="max-w-xs">
+                        {/* 🆕 عرض اسم البائع */}
+                        {visitor.followUps[0].salesName && (
+                          <div className="text-orange-600 font-medium text-xs mb-1">
+                            👤 {visitor.followUps[0].salesName}
+                          </div>
+                        )}
+                        <div className="text-gray-600 truncate">
+                          {visitor.followUps[0].notes}
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {new Date(visitor.followUps[0].createdAt).toLocaleDateString('ar-EG')}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">لا توجد متابعات</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    {new Date(visitor.createdAt).toLocaleDateString('ar-EG')}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedVisitor(visitor)
+                          setShowFollowUpForm(true)
+                        }}
+                        className="text-blue-600 hover:text-blue-800 text-l px-4"
+                        title="إضافة متابعة"
+                      >
+                        📝متابعه
+                      </button>
+
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {visitors.length === 0 && (
+            <div className="text-center py-12 text-gray-500">
+              لا يوجد زوار حالياً
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
