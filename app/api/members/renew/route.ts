@@ -1,4 +1,4 @@
-// app/api/members/renew/route.ts - النسخة المُصلحة
+// app/api/members/renew/route.ts - مع إضافة staffName
 import { NextResponse } from 'next/server'
 import { prisma } from '../../../../lib/prisma'
 
@@ -40,7 +40,8 @@ export async function POST(request: Request) {
       startDate, 
       expiryDate, 
       notes, 
-      paymentMethod 
+      paymentMethod,
+      staffName // ✅ إضافة اسم الموظف
     } = body
 
     console.log('🔄 تجديد اشتراك عضو:', { 
@@ -51,8 +52,14 @@ export async function POST(request: Request) {
       invitations, 
       startDate, 
       expiryDate, 
-      paymentMethod 
+      paymentMethod,
+      staffName // ✅
     })
+
+    // ✅ التحقق من اسم الموظف
+    if (!staffName || !staffName.trim()) {
+      return NextResponse.json({ error: 'اسم الموظف مطلوب' }, { status: 400 })
+    }
 
     // جلب بيانات العضو
     const member = await prisma.member.findUnique({
@@ -129,10 +136,11 @@ export async function POST(request: Request) {
 
       const receipt = await prisma.receipt.create({
         data: {
-          receiptNumber: availableReceiptNumber, // ✅ استخدام الرقم المتاح
+          receiptNumber: availableReceiptNumber,
           type: 'تجديد عضويه',
           amount: paidAmount,
           paymentMethod: paymentMethod || 'cash',
+          staffName: staffName.trim(), // ✅ حفظ اسم الموظف
           itemDetails: JSON.stringify({
             memberNumber: member.memberNumber,
             memberName: member.name,
@@ -157,6 +165,7 @@ export async function POST(request: Request) {
             newExpiryDate: expiryDate,
             subscriptionDays: subscriptionDays,
             isRenewal: true,
+            staffName: staffName.trim(), // ✅ حفظ في التفاصيل أيضاً
           }),
           memberId: member.id,
         },
@@ -179,6 +188,7 @@ export async function POST(request: Request) {
           receiptNumber: receipt.receiptNumber,
           amount: receipt.amount,
           paymentMethod: receipt.paymentMethod,
+          staffName: receipt.staffName, // ✅
           itemDetails: JSON.parse(receipt.itemDetails),
           createdAt: receipt.createdAt
         }

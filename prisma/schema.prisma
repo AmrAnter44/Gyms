@@ -9,10 +9,10 @@ generator client {
 
 model Member {
   id                String    @id @default(cuid())
-  memberNumber      Int       @unique
+  memberNumber      Int?      @unique // ✅ جعلها اختيارية لدعم Other
   name              String
   phone             String
-  profileImage      String?   // ✅ إضافة حقل الصورة
+  profileImage      String?
   inBodyScans       Int       @default(0)
   invitations       Int       @default(0)
   freePTSessions    Int       @default(0)
@@ -28,7 +28,7 @@ model Member {
 }
 
 model PT {
-  ptNumber          Int         @id  // المعرف الأساسي هو ptNumber
+  ptNumber          Int         @id
   clientName        String
   phone             String
   sessionsPurchased Int
@@ -40,18 +40,17 @@ model PT {
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
   receipts          Receipt[]
-  sessions          PTSession[] // سجلات حضور الجلسات
+  sessions          PTSession[]
 }
 
-// 🆕 نموذج جديد لتسجيل حضور جلسات PT
 model PTSession {
   id            String   @id @default(cuid())
   ptNumber      Int
   pt            PT       @relation(fields: [ptNumber], references: [ptNumber])
-  clientName    String   // اسم العميل
-  coachName     String   // اسم المدرب
-  sessionDate   DateTime // تاريخ ووقت الجلسة
-  notes         String?  // ملاحظات
+  clientName    String
+  coachName     String
+  sessionDate   DateTime
+  notes         String?
   createdAt     DateTime @default(now())
   
   @@index([ptNumber])
@@ -74,9 +73,9 @@ model Visitor {
   name          String
   phone         String      @unique
   notes         String?
-  source        String      @default("walk-in") // walk-in, facebook, instagram, friend, other
-  interestedIn  String?     // gym, classes, personal-training, etc.
-  status        String      @default("pending") // pending, contacted, subscribed, rejected
+  source        String      @default("walk-in")
+  interestedIn  String?
+  status        String      @default("pending")
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   
@@ -87,7 +86,6 @@ model Visitor {
   @@index([phone])
 }
 
-// 🆕 نموذج جديد لمتابعة الزوار
 model FollowUp {
   id                String    @id @default(cuid())
   visitorId         String
@@ -95,8 +93,8 @@ model FollowUp {
   notes             String
   contacted         Boolean   @default(false)
   nextFollowUpDate  DateTime?
-  result            String?   // interested, not-interested, postponed, subscribed
-  salesName         String?   // 🆕 اسم البائع الذي قام بالمتابعة
+  result            String?
+  salesName         String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   
@@ -112,12 +110,13 @@ model Receipt {
   amount        Float
   itemDetails   String        
   paymentMethod String        @default("cash") 
+  staffName     String?       // ✅ إضافة اسم الموظف
   createdAt     DateTime      @default(now())
   
   memberId      String?
   member        Member?       @relation(fields: [memberId], references: [id])
   
-  ptNumber      Int?          // تغيير من ptId إلى ptNumber
+  ptNumber      Int?
   pt            PT?           @relation(fields: [ptNumber], references: [ptNumber])
   
   dayUseId      String?
@@ -161,15 +160,13 @@ model Expense {
   isPaid      Boolean  @default(false)
 }
 
-// 🆕 نموذج جديد للدعوات
 model Invitation {
   id          String   @id @default(cuid())
-  guestName   String   // اسم الضيف
-  guestPhone  String   // رقم هاتف الضيف
-  notes       String?  // ملاحظات
+  guestName   String
+  guestPhone  String
+  notes       String?
   createdAt   DateTime @default(now())
   
-  memberId    String   // ربط مع العضو الذي استخدم الدعوة
+  memberId    String
   member      Member   @relation(fields: [memberId], references: [id])
 }
-

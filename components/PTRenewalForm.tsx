@@ -1,8 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { calculateDaysBetween, formatDateYMD, formatDurationInMonths } from '../lib/dateFormatter'
 import PaymentMethodSelector from './Paymentmethodselector'
+
+interface Staff {
+  id: string
+  name: string
+  phone?: string
+  position?: string
+  isActive: boolean
+}
 
 interface PTSession {
   ptNumber: number
@@ -23,6 +31,9 @@ interface PTRenewalFormProps {
 }
 
 export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewalFormProps) {
+  const [coaches, setCoaches] = useState<Staff[]>([])
+  const [coachesLoading, setCoachesLoading] = useState(true)
+
   const getDefaultStartDate = () => {
     if (session.expiryDate) {
       const expiry = new Date(session.expiryDate)
@@ -46,6 +57,26 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
   })
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
+
+  // جلب الكوتشات
+  useEffect(() => {
+    fetchCoaches()
+  }, [])
+
+  const fetchCoaches = async () => {
+    try {
+      const response = await fetch('/api/staff')
+      const data: Staff[] = await response.json()
+      const activeCoaches = data.filter(
+        (staff) => staff.isActive && staff.position?.toLowerCase().includes('مدرب')
+      )
+      setCoaches(activeCoaches)
+    } catch (error) {
+      console.error('Error fetching coaches:', error)
+    } finally {
+      setCoachesLoading(false)
+    }
+  }
 
   const calculateDuration = () => {
     if (!formData.startDate || !formData.expiryDate) return null
@@ -104,7 +135,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
             
             if (receipts.length > 0) {
               const latestReceipt = receipts[0]
-              // يمكنك استدعاء نظام الطباعة هنا
               console.log('Receipt ready for print:', latestReceipt)
             }
           } catch (err) {
@@ -202,7 +232,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
                   </label>
                   <input
                     type="tel"
-                    required
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     className="w-full px-4 py-3 border-2 rounded-lg"
@@ -226,19 +255,44 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
                   />
                 </div>
 
-                {/* اسم المدرب */}
+                {/* اسم المدرب - قائمة منسدلة */}
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    اسم المدرب
+                    اسم المدرب <span className="text-red-600">*</span>
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.coachName}
-                    onChange={(e) => setFormData({ ...formData, coachName: e.target.value })}
-                    className="w-full px-4 py-3 border-2 rounded-lg"
-                    placeholder="اسم المدرب"
-                  />
+                  {coachesLoading ? (
+                    <div className="w-full px-4 py-3 border-2 rounded-lg bg-gray-50 text-gray-500">
+                      جاري تحميل الكوتشات...
+                    </div>
+                  ) : coaches.length === 0 ? (
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        required
+                        value={formData.coachName}
+                        onChange={(e) => setFormData({ ...formData, coachName: e.target.value })}
+                        className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg"
+                        placeholder="اسم المدرب"
+                      />
+                      <p className="text-xs text-amber-600">
+                        ⚠️ لا يوجد كوتشات نشطين. يمكنك الإدخال يدوياً
+                      </p>
+                    </div>
+                  ) : (
+                    <select
+                      required
+                      value={formData.coachName}
+                      onChange={(e) => setFormData({ ...formData, coachName: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg bg-white"
+                    >
+                      <option value="">-- اختر المدرب --</option>
+                      {coaches.map((coach) => (
+                        <option key={coach.id} value={coach.name}>
+                          {coach.name} {coach.phone && `(${coach.phone})`}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
 
                 {/* سعر الجلسة */}

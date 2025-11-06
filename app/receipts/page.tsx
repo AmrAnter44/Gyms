@@ -10,6 +10,7 @@ interface ReceiptData {
   amount: number
   itemDetails: string
   paymentMethod: string
+  staffName?: string // ✅ إضافة اسم الموظف
   createdAt: string
   memberId?: string
   ptId?: string
@@ -76,7 +77,8 @@ export default function ReceiptsPage() {
           details.memberName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           details.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           details.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (details.memberNumber && details.memberNumber.toString().includes(searchTerm))
+          (details.memberNumber && details.memberNumber.toString().includes(searchTerm)) ||
+          r.staffName?.toLowerCase().includes(searchTerm.toLowerCase()) // ✅ البحث باسم الموظف
         )
       })
     }
@@ -292,7 +294,7 @@ export default function ReceiptsPage() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyPress={handleKeyPress}
-              placeholder="رقم الإيصال، الاسم..."
+              placeholder="رقم، اسم، موظف..."
               className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -378,6 +380,7 @@ export default function ReceiptsPage() {
                   <th className="px-6 py-4 text-right font-bold">التفاصيل</th>
                   <th className="px-6 py-4 text-right font-bold">المبلغ</th>
                   <th className="px-6 py-4 text-right font-bold">طريقة الدفع</th>
+                  <th className="px-6 py-4 text-right font-bold">الموظف</th> {/* ✅ عمود جديد */}
                   <th className="px-6 py-4 text-right font-bold">التاريخ</th>
                   <th className="px-6 py-4 text-right font-bold">إجراءات</th>
                 </tr>
@@ -438,6 +441,17 @@ export default function ReceiptsPage() {
                           {getPaymentMethodLabel(receipt.paymentMethod)}
                         </span>
                       </td>
+                      {/* ✅ عرض اسم الموظف */}
+                      <td className="px-6 py-4">
+                        {receipt.staffName ? (
+                          <div className="flex items-center gap-2">
+                            <span className="text-2xl">👷</span>
+                            <span className="font-medium text-gray-800">{receipt.staffName}</span>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400 text-sm">-</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
                         <div>
                           <p className="font-medium">
@@ -488,7 +502,7 @@ export default function ReceiptsPage() {
           <div className="flex-1">
             <h4 className="font-bold text-blue-800 mb-2">نصائح سريعة</h4>
             <ul className="space-y-1 text-sm text-blue-800">
-              <li>• استخدم البحث للعثور على إيصال محدد برقمه أو باسم العميل</li>
+              <li>• استخدم البحث للعثور على إيصال محدد برقمه أو باسم العميل أو الموظف</li>
               <li>• فلتر حسب طريقة الدفع لمعرفة الإيرادات من كل وسيلة</li>
               <li>• اطبع الإيصال مباشرة من زر الطباعة 🖨️</li>
               <li>• رقم الإيصال مستقل ومتسلسل لجميع العمليات</li>

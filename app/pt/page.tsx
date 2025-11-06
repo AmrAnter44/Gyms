@@ -1,12 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ReceiptToPrint } from '../../components/ReceiptToPrint'
-import PaymentMethodSelector from '../../components/Paymentmethodselector'
-import PTRenewalForm from '../../components/PTRenewalForm'
-import { formatDateYMD, calculateRemainingDays, calculateDaysBetween, formatDurationInMonths } from '../../lib/dateFormatter'
-import { printReceiptFromData } from '../../lib/printSystem'
+
+interface Staff {
+  id: string
+  name: string
+  phone?: string
+  position?: string
+  isActive: boolean
+}
 
 interface PTSession {
   ptNumber: number
@@ -16,33 +19,38 @@ interface PTSession {
   sessionsRemaining: number
   coachName: string
   pricePerSession: number
-  startDate?: string
-  expiryDate?: string
+  startDate: string | null
+  expiryDate: string | null
   createdAt: string
 }
 
 export default function PTPage() {
   const router = useRouter()
   const [sessions, setSessions] = useState<PTSession[]>([])
+  const [coaches, setCoaches] = useState<Staff[]>([])
   const [showForm, setShowForm] = useState(false)
+  const [editingSession, setEditingSession] = useState<PTSession | null>(null)
   const [loading, setLoading] = useState(true)
+  const [coachesLoading, setCoachesLoading] = useState(true)
   const [message, setMessage] = useState('')
-  const [showRenewalForm, setShowRenewalForm] = useState(false)
-  const [selectedSession, setSelectedSession] = useState<PTSession | null>(null)
-  
+  const [searchTerm, setSearchTerm] = useState('')
+
   const [formData, setFormData] = useState({
     ptNumber: '',
     clientName: '',
     phone: '',
-    sessionsPurchased: 0,
+    sessionsPurchased: 8,
     coachName: '',
     pricePerSession: 0,
-    paymentMethod: 'cash',
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: '',
     expiryDate: '',
+    paymentMethod: 'cash' as 'cash' | 'visa' | 'instapay',
   })
-  const [showReceipt, setShowReceipt] = useState(false)
-  const [receiptData, setReceiptData] = useState<any>(null)
+
+  useEffect(() => {
+    fetchSessions()
+    fetchCoaches()
+  }, [])
 
   const fetchSessions = async () => {
     try {
@@ -56,26 +64,52 @@ export default function PTPage() {
     }
   }
 
-  useEffect(() => {
-    fetchSessions()
-  }, [])
-
-  const calculateDuration = () => {
-    if (!formData.startDate || !formData.expiryDate) return null
-    return calculateDaysBetween(formData.startDate, formData.expiryDate)
+  const fetchCoaches = async () => {
+    try {
+      const response = await fetch('/api/staff')
+      const data: Staff[] = await response.json()
+      // فلترة الكوتشات النشطين فقط
+      const activeCoaches = data.filter(
+        (staff) => staff.isActive && staff.position?.toLowerCase().includes('مدرب')
+      )
+      setCoaches(activeCoaches)
+    } catch (error) {
+      console.error('Error fetching coaches:', error)
+    } finally {
+      setCoachesLoading(false)
+    }
   }
 
-  const calculateExpiryFromMonths = (months: number) => {
-    if (!formData.startDate) return
-    
-    const start = new Date(formData.startDate)
-    const expiry = new Date(start)
-    expiry.setMonth(expiry.getMonth() + months)
-    
-    setFormData(prev => ({ 
-      ...prev, 
-      expiryDate: expiry.toISOString().split('T')[0] 
-    }))
+  const resetForm = () => {
+    setFormData({
+      ptNumber: '',
+      clientName: '',
+      phone: '',
+      sessionsPurchased: 8,
+      coachName: '',
+      pricePerSession: 0,
+      startDate: '',
+      expiryDate: '',
+      paymentMethod: 'cash',
+    })
+    setEditingSession(null)
+    setShowForm(false)
+  }
+
+  const handleEdit = (session: PTSession) => {
+    setFormData({
+      ptNumber: session.ptNumber.toString(),
+      clientName: session.clientName,
+      phone: session.phone,
+      sessionsPurchased: session.sessionsPurchased,
+      coachName: session.coachName,
+      pricePerSession: session.pricePerSession,
+      startDate: session.startDate ? new Date(session.startDate).toISOString().split('T')[0] : '',
+      expiryDate: session.expiryDate ? new Date(session.expiryDate).toISOString().split('T')[0] : '',
+      paymentMethod: 'cash',
+    })
+    setEditingSession(session)
+    setShowForm(true)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -83,87 +117,28 @@ export default function PTPage() {
     setLoading(true)
     setMessage('')
 
-    if (!formData.ptNumber) {
-      setMessage('❌ يجب إدخال رقم PT')
-      setLoading(false)
-      return
-    }
-
-    if (formData.startDate && formData.expiryDate) {
-      const start = new Date(formData.startDate)
-      const end = new Date(formData.expiryDate)
-      
-      if (end <= start) {
-        setMessage('❌ تاريخ الانتهاء يجب أن يكون بعد تاريخ البداية')
-        setLoading(false)
-        return
-      }
-    }
-
     try {
-      const response = await fetch('/api/pt', {
-        method: 'POST',
+      const url = '/api/pt'
+      const method = editingSession ? 'PUT' : 'POST'
+      const body = editingSession
+        ? { ptNumber: editingSession.ptNumber, ...formData }
+        : formData
+
+      const response = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(body),
       })
 
       const result = await response.json()
 
       if (response.ok) {
-        const pt = result
-        
-        // طباعة الإيصال مباشرة
-        try {
-          const receiptsResponse = await fetch(`/api/receipts?ptNumber=${pt.ptNumber}`)
-          const receipts = await receiptsResponse.json()
-          
-          if (receipts.length > 0) {
-            const receipt = receipts[0]
-            
-            // طباعة الإيصال تلقائيًا
-            setTimeout(() => {
-              printReceiptFromData(
-                receipt.receiptNumber,
-                receipt.type,
-                receipt.amount,
-                receipt.itemDetails,
-                receipt.createdAt,
-                formData.paymentMethod
-              )
-            }, 500)
-            
-            // حفظ بيانات الإيصال للطباعة لاحقًا إذا لزم الأمر
-            setReceiptData({
-              receiptNumber: receipt.receiptNumber,
-              type: receipt.type,
-              amount: receipt.amount,
-              details: JSON.parse(receipt.itemDetails),
-              date: new Date(receipt.createdAt),
-              paymentMethod: formData.paymentMethod
-            })
-          }
-        } catch (err) {
-          console.error('Error fetching receipt:', err)
-        }
-
-        setFormData({
-          ptNumber: '',
-          clientName: '',
-          phone: '',
-          sessionsPurchased: 0,
-          coachName: '',
-          pricePerSession: 0,
-          paymentMethod: 'cash',
-          startDate: new Date().toISOString().split('T')[0],
-          expiryDate: '',
-        })
-        
-        setMessage('✅ تم إضافة الجلسة بنجاح!')
+        setMessage(editingSession ? '✅ تم تحديث جلسة PT بنجاح!' : '✅ تم إضافة جلسة PT بنجاح!')
         setTimeout(() => setMessage(''), 3000)
         fetchSessions()
-        setShowForm(false)
+        resetForm()
       } else {
-        setMessage(`❌ ${result.error || 'فشل إضافة الجلسة'}`)
+        setMessage(`❌ ${result.error || 'فشلت العملية'}`)
       }
     } catch (error) {
       console.error(error)
@@ -173,80 +148,113 @@ export default function PTPage() {
     }
   }
 
-  const handleRenewal = (session: PTSession) => {
-    setSelectedSession(session)
-    setShowRenewalForm(true)
+  const handleDelete = async (ptNumber: number) => {
+    if (!confirm('هل أنت متأكد من حذف هذه الجلسة؟')) return
+
+    try {
+      await fetch(`/api/pt?ptNumber=${ptNumber}`, { method: 'DELETE' })
+      fetchSessions()
+    } catch (error) {
+      console.error('Error:', error)
+    }
   }
 
-  const duration = calculateDuration()
+  const handleRenew = (session: PTSession) => {
+    router.push(`/pt/renew?ptNumber=${session.ptNumber}`)
+  }
+
+  const handleRegisterSession = (session: PTSession) => {
+    router.push(`/pt/sessions/register?ptNumber=${session.ptNumber}`)
+  }
+
+  // فلترة الجلسات حسب البحث
+  const filteredSessions = sessions.filter(
+    (session) =>
+      session.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      session.coachName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      session.ptNumber.toString().includes(searchTerm) ||
+      session.phone.includes(searchTerm)
+  )
+
+  // إحصائيات
+  const totalSessions = sessions.reduce((sum, s) => sum + s.sessionsPurchased, 0)
+  const remainingSessions = sessions.reduce((sum, s) => sum + s.sessionsRemaining, 0)
+  const activePTs = sessions.filter((s) => s.sessionsRemaining > 0).length
 
   return (
     <div className="container mx-auto p-6" dir="rtl">
-      {/* Header محدث مع الأزرار الجديدة */}
-      <div className="flex justify-between items-center mb-6 flex-wrap gap-3">
+      <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-3xl font-bold mb-2">التدريب الشخصي (PT)</h1>
-          <p className="text-gray-600">إدارة جلسات التدريب الشخصي</p>
+          <h1 className="text-3xl font-bold mb-2">💪 إدارة جلسات PT</h1>
+          <p className="text-gray-600">إضافة وتعديل وحذف جلسات التدريب الشخصي</p>
         </div>
-        
-        <div className="flex gap-3 flex-wrap">
-          {/* زر تسجيل حضور جديد */}
+        <div className="flex gap-3">
           <button
-            onClick={() => router.push('/pt/sessions/register')}
-            className="bg-blue-600 text-white px-5 py-2 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 shadow-md"
-            title="تسجيل حضور جلسة PT"
+            onClick={() => router.push('/pt/commission')}
+            className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-6 py-2 rounded-lg hover:from-purple-700 hover:to-purple-800 transition transform hover:scale-105 shadow-lg flex items-center gap-2"
           >
-            <span className="text-xl">📝</span>
-            <span className="font-semibold">تسجيل حضور</span>
+            <span>💰</span>
+            <span>حاسبة التحصيل</span>
           </button>
-          
-          {/* زر سجل الحضور */}
           <button
-            onClick={() => router.push('/pt/sessions/history')}
-            className="bg-purple-600 text-white px-5 py-2 rounded-lg hover:bg-purple-700 transition flex items-center gap-2 shadow-md"
-            title="عرض سجل حضور الجلسات"
-          >
-            <span className="text-xl">📊</span>
-            <span className="font-semibold">سجل الحضور</span>
-          </button>
-          
-          {/* زر إضافة جلسة جديدة */}
+  onClick={() => router.push('/pt/sessions/history')}
+  className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-2 rounded-lg hover:from-indigo-700 hover:to-indigo-800 transition transform hover:scale-105 shadow-lg flex items-center gap-2"
+>
+  <span>📊</span>
+  <span>سجل الحضور</span>
+</button>
           <button
-            onClick={() => setShowForm(!showForm)}
-            className="bg-green-600 text-white px-5 py-2 rounded-lg hover:bg-green-700 transition shadow-md"
-            title="إضافة جلسة PT جديدة"
+            onClick={() => {
+              resetForm()
+              setShowForm(!showForm)
+            }}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition transform hover:scale-105"
           >
-            {showForm ? '✖️ إخفاء النموذج' : '➕ إضافة جلسة جديدة'}
+            {showForm ? 'إخفاء النموذج' : '➕ إضافة جلسة PT جديدة'}
           </button>
         </div>
       </div>
 
+      {message && (
+        <div
+          className={`mb-6 p-4 rounded-lg ${
+            message.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}
+        >
+          {message}
+        </div>
+      )}
+
+      {/* نموذج الإضافة/التعديل */}
       {showForm && (
-        <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-          <h2 className="text-xl font-semibold mb-4">إضافة جلسة PT جديدة</h2>
-          
-          {message && (
-            <div className={`mb-4 p-3 rounded-lg ${message.includes('✅') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-              {message}
-            </div>
-          )}
-          
+        <div className="bg-white p-6 rounded-xl shadow-lg mb-6 border-2 border-blue-100">
+          <h2 className="text-xl font-semibold mb-4">
+            {editingSession ? 'تعديل جلسة PT' : 'إضافة جلسة PT جديدة'}
+          </h2>
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* رقم PT */}
               <div>
-                <label className="block text-sm font-medium mb-1">رقم PT *</label>
+                <label className="block text-sm font-medium mb-1">
+                  رقم ID <span className="text-red-600">*</span>
+                </label>
                 <input
                   type="number"
                   required
+                  disabled={!!editingSession}
                   value={formData.ptNumber}
                   onChange={(e) => setFormData({ ...formData, ptNumber: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg font-bold text-green-600"
-                  placeholder="أدخل رقم PT"
+                  className="w-full px-3 py-2 border rounded-lg disabled:bg-gray-100"
+                  placeholder="مثال: 1001"
                 />
               </div>
 
+              {/* اسم العميل */}
               <div>
-                <label className="block text-sm font-medium mb-1">اسم العميل</label>
+                <label className="block text-sm font-medium mb-1">
+                  اسم العميل <span className="text-red-600">*</span>
+                </label>
                 <input
                   type="text"
                   required
@@ -257,11 +265,11 @@ export default function PTPage() {
                 />
               </div>
 
+              {/* رقم الهاتف */}
               <div>
                 <label className="block text-sm font-medium mb-1">رقم الهاتف</label>
                 <input
                   type="tel"
-                  required
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   className="w-full px-3 py-2 border rounded-lg"
@@ -269,140 +277,205 @@ export default function PTPage() {
                 />
               </div>
 
+              {/* اسم الكوتش - قائمة منسدلة */}
               <div>
-                <label className="block text-sm font-medium mb-1">عدد الجلسات</label>
+                <label className="block text-sm font-medium mb-1">
+                  اسم الكوتش <span className="text-red-600">*</span>
+                </label>
+                {coachesLoading ? (
+                  <div className="w-full px-3 py-2 border rounded-lg bg-gray-50 text-gray-500">
+                    جاري تحميل الكوتشات...
+                  </div>
+                ) : coaches.length === 0 ? (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      required
+                      value={formData.coachName}
+                      onChange={(e) => setFormData({ ...formData, coachName: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-lg"
+                      placeholder="اسم الكوتش"
+                    />
+                    <p className="text-xs text-amber-600">
+                      ⚠️ لا يوجد كوتشات نشطين. يمكنك الإدخال يدوياً أو إضافة كوتش من صفحة الموظفين
+                    </p>
+                  </div>
+                ) : (
+                  <select
+                    required
+                    value={formData.coachName}
+                    onChange={(e) => setFormData({ ...formData, coachName: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg bg-white"
+                  >
+                    <option value="">-- اختر الكوتش --</option>
+                    {coaches.map((coach) => (
+                      <option key={coach.id} value={coach.name}>
+                        {coach.name} {coach.phone && `(${coach.phone})`}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              {/* عدد الجلسات */}
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  عدد الجلسات <span className="text-red-600">*</span>
+                </label>
                 <input
                   type="number"
                   required
                   min="1"
                   value={formData.sessionsPurchased}
-                  onChange={(e) => setFormData({ ...formData, sessionsPurchased: parseInt(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, sessionsPurchased: parseInt(e.target.value) })
+                  }
                   className="w-full px-3 py-2 border rounded-lg"
-                  placeholder="عدد الجلسات"
+                  placeholder="8"
                 />
               </div>
 
+              {/* سعر الجلسة */}
               <div>
-                <label className="block text-sm font-medium mb-1">اسم المدرب</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.coachName}
-                  onChange={(e) => setFormData({ ...formData, coachName: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg"
-                  placeholder="اسم المدرب"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1">سعر الجلسة</label>
+                <label className="block text-sm font-medium mb-1">
+                  سعر الجلسة (ج.م) <span className="text-red-600">*</span>
+                </label>
                 <input
                   type="number"
                   required
                   min="0"
+                  step="0.01"
                   value={formData.pricePerSession}
-                  onChange={(e) => setFormData({ ...formData, pricePerSession: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setFormData({ ...formData, pricePerSession: parseFloat(e.target.value) })
+                  }
                   className="w-full px-3 py-2 border rounded-lg"
-                  placeholder="0.00"
+                  placeholder="200"
                 />
               </div>
 
-              <div className="col-span-2">
-                <div className="bg-gray-100 px-3 py-2 rounded-lg">
-                  <span className="text-sm text-gray-600">الإجمالي: </span>
-                  <span className="font-bold text-lg">
-                    {formData.sessionsPurchased * formData.pricePerSession} ج.م
+              {/* تاريخ البداية */}
+              <div>
+                <label className="block text-sm font-medium mb-1">تاريخ البداية</label>
+                <input
+                  type="date"
+                  value={formData.startDate}
+                  onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+
+              {/* تاريخ الانتهاء */}
+              <div>
+                <label className="block text-sm font-medium mb-1">تاريخ الانتهاء</label>
+                <input
+                  type="date"
+                  value={formData.expiryDate}
+                  onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+
+              {/* طريقة الدفع */}
+              <div>
+                <label className="block text-sm font-medium mb-1">طريقة الدفع</label>
+                <select
+                  value={formData.paymentMethod}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      paymentMethod: e.target.value as 'cash' | 'visa' | 'instapay',
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-lg"
+                >
+                  <option value="cash">💵 كاش</option>
+                  <option value="visa">💳 فيزا</option>
+                  <option value="instapay">📱 انستاباي</option>
+                </select>
+              </div>
+            </div>
+
+            {/* عرض الإجمالي */}
+            {formData.sessionsPurchased > 0 && formData.pricePerSession > 0 && (
+              <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-lg font-semibold">الإجمالي:</span>
+                  <span className="text-2xl font-bold text-green-600">
+                    {(formData.sessionsPurchased * formData.pricePerSession).toFixed(2)} ج.م
                   </span>
                 </div>
               </div>
-            </div>
+            )}
 
-            <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
-              <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
-                <span>📅</span>
-                <span>فترة الاشتراك (اختياري)</span>
-              </h3>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    تاريخ البداية
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-3 py-2 border-2 rounded-lg font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    تاريخ الانتهاء
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.expiryDate}
-                    onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                    className="w-full px-3 py-2 border-2 rounded-lg font-mono"
-                  />
-                </div>
-              </div>
-
-              <div className="mb-3">
-                <p className="text-sm font-medium mb-2">⚡ إضافة سريعة:</p>
-                <div className="flex flex-wrap gap-2">
-                  {[1, 2, 3, 6, 9, 12].map(months => (
-                    <button
-                      key={months}
-                      type="button"
-                      onClick={() => calculateExpiryFromMonths(months)}
-                      className="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-lg text-sm transition"
-                    >
-                      + {months} {months === 1 ? 'شهر' : 'أشهر'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {duration !== null && formData.expiryDate && (
-                <div className="bg-white border-2 border-blue-300 rounded-lg p-3">
-                  {duration > 0 ? (
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">⏱️</span>
-                      <div>
-                        <p className="font-bold text-blue-800">مدة الاشتراك:</p>
-                        <p className="text-lg font-mono">
-                          {formatDurationInMonths(duration)}
-                        </p>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-red-600">❌ تاريخ الانتهاء يجب أن يكون بعد تاريخ البداية</p>
-                  )}
-                </div>
+            {/* أزرار التحكم */}
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+              >
+                {loading ? 'جاري الحفظ...' : editingSession ? 'تحديث' : 'إضافة جلسة PT'}
+              </button>
+              {editingSession && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="px-6 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300"
+                >
+                  إلغاء
+                </button>
               )}
             </div>
-
-            <div className="bg-gradient-to-br from-green-50 to-blue-50 border-2 border-green-200 rounded-xl p-5">
-              <PaymentMethodSelector
-                value={formData.paymentMethod}
-                onChange={(method) => setFormData({ ...formData, paymentMethod: method })}
-                required
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading || (duration !== null && formData.expiryDate && duration <= 0)}
-              className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              {loading ? 'جاري الحفظ...' : 'إضافة جلسة'}
-            </button>
           </form>
         </div>
       )}
 
+      {/* الإحصائيات */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg p-6 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-blue-100 text-sm mb-1">إجمالي الجلسات</p>
+              <p className="text-4xl font-bold">{totalSessions}</p>
+            </div>
+            <div className="text-5xl opacity-20">💪</div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-green-500 to-green-600 text-white rounded-lg p-6 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-green-100 text-sm mb-1">الجلسات المتبقية</p>
+              <p className="text-4xl font-bold">{remainingSessions}</p>
+            </div>
+            <div className="text-5xl opacity-20">⏳</div>
+          </div>
+        </div>
+
+        <div className="bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-lg p-6 shadow-lg">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-purple-100 text-sm mb-1">PT نشطة</p>
+              <p className="text-4xl font-bold">{activePTs}</p>
+            </div>
+            <div className="text-5xl opacity-20">🔥</div>
+          </div>
+        </div>
+      </div>
+
+      {/* البحث */}
+      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+        <input
+          type="text"
+          placeholder="🔍 ابحث برقم PT أو اسم العميل أو الكوتش أو رقم الهاتف..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full px-4 py-3 border-2 rounded-lg text-lg"
+        />
+      </div>
+
+      {/* جدول الجلسات */}
       {loading ? (
         <div className="text-center py-12">جاري التحميل...</div>
       ) : (
@@ -413,79 +486,92 @@ export default function PTPage() {
                 <tr>
                   <th className="px-4 py-3 text-right">رقم PT</th>
                   <th className="px-4 py-3 text-right">العميل</th>
-                  <th className="px-4 py-3 text-right">الهاتف</th>
-                  <th className="px-4 py-3 text-right">المدرب</th>
-                  <th className="px-4 py-3 text-right">المشتراة</th>
-                  <th className="px-4 py-3 text-right">المتبقية</th>
+                  <th className="px-4 py-3 text-right">الكوتش</th>
+                  <th className="px-4 py-3 text-right">الجلسات</th>
                   <th className="px-4 py-3 text-right">السعر</th>
-                  <th className="px-4 py-3 text-right">تاريخ البداية</th>
-                  <th className="px-4 py-3 text-right">تاريخ الانتهاء</th>
+                  <th className="px-4 py-3 text-right">الإجمالي</th>
+                  <th className="px-4 py-3 text-right">التواريخ</th>
                   <th className="px-4 py-3 text-right">إجراءات</th>
                 </tr>
               </thead>
               <tbody>
-                {sessions.map((session) => {
-                  const isExpired = session.expiryDate ? new Date(session.expiryDate) < new Date() : false
-                  const daysRemaining = calculateRemainingDays(session.expiryDate)
-                  const isExpiringSoon = daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 7
-                  
+                {filteredSessions.map((session) => {
+                  const isExpiringSoon =
+                    session.expiryDate &&
+                    new Date(session.expiryDate) < new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+                  const isExpired = session.expiryDate && new Date(session.expiryDate) < new Date()
+
                   return (
-                    <tr key={session.ptNumber} className="border-t hover:bg-gray-50">
-                      <td className="px-4 py-3 font-bold text-green-600">#{session.ptNumber}</td>
-                      <td className="px-4 py-3">{session.clientName}</td>
-                      <td className="px-4 py-3">{session.phone}</td>
-                      <td className="px-4 py-3">{session.coachName}</td>
-                      <td className="px-4 py-3">{session.sessionsPurchased}</td>
+                    <tr
+                      key={session.ptNumber}
+                      className={`border-t hover:bg-gray-50 ${
+                        isExpired ? 'bg-red-50' : isExpiringSoon ? 'bg-yellow-50' : ''
+                      }`}
+                    >
                       <td className="px-4 py-3">
-                        <span className={`font-bold ${session.sessionsRemaining === 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {session.sessionsRemaining}
-                        </span>
+                        <span className="font-bold text-blue-600">#{session.ptNumber}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div>
+                          <p className="font-semibold">{session.clientName}</p>
+                          <p className="text-sm text-gray-600">{session.phone}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">{session.coachName}</td>
+                      <td className="px-4 py-3">
+                        <div className="text-center">
+                          <p
+                            className={`font-bold ${
+                              session.sessionsRemaining === 0
+                                ? 'text-red-600'
+                                : session.sessionsRemaining <= 3
+                                ? 'text-orange-600'
+                                : 'text-green-600'
+                            }`}
+                          >
+                            {session.sessionsRemaining}
+                          </p>
+                          <p className="text-xs text-gray-500">من {session.sessionsPurchased}</p>
+                        </div>
                       </td>
                       <td className="px-4 py-3">{session.pricePerSession} ج.م</td>
-                      <td className="px-4 py-3">
-                        <span className="text-gray-700 font-mono">
-                          {formatDateYMD(session.startDate)}
-                        </span>
+                      <td className="px-4 py-3 font-bold text-green-600">
+                        {(session.sessionsPurchased * session.pricePerSession).toFixed(0)} ج.م
                       </td>
                       <td className="px-4 py-3">
-                        {session.expiryDate ? (
-                          <div>
-                            <span className={`font-mono ${isExpired ? 'text-red-600 font-bold' : isExpiringSoon ? 'text-orange-600 font-bold' : ''}`}>
-                              {formatDateYMD(session.expiryDate)}
-                            </span>
-                            {daysRemaining !== null && daysRemaining > 0 && (
-                              <p className={`text-xs ${isExpiringSoon ? 'text-orange-600' : 'text-gray-500'}`}>
-                                {isExpiringSoon && '⚠️ '} باقي {daysRemaining} يوم
-                              </p>
-                            )}
-                            {isExpired && daysRemaining !== null && (
-                              <p className="text-xs text-red-600">
-                                ❌ منتهي منذ {Math.abs(daysRemaining)} يوم
-                              </p>
-                            )}
-                          </div>
-                        ) : '-'}
+                        <div className="text-xs">
+                          {session.startDate && (
+                            <p>
+                              من: {new Date(session.startDate).toLocaleDateString('ar-EG')}
+                            </p>
+                          )}
+                          {session.expiryDate && (
+                            <p className={isExpired ? 'text-red-600 font-bold' : ''}>
+                              إلى: {new Date(session.expiryDate).toLocaleDateString('ar-EG')}
+                            </p>
+                          )}
+                          {isExpired && <p className="text-red-600 font-bold">❌ منتهية</p>}
+                          {!isExpired && isExpiringSoon && (
+                            <p className="text-orange-600 font-bold">⚠️ قريبة الانتهاء</p>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex flex-col gap-2">
-                          {/* زر تسجيل حضور محدث - ينقل لصفحة التسجيل الجديدة */}
+                        <div className="flex flex-wrap gap-2">
                           <button
-                            onClick={() => router.push(`/pt/sessions/register?ptNumber=${session.ptNumber}`)}
+                            onClick={() => handleRegisterSession(session)}
                             disabled={session.sessionsRemaining === 0}
-                            className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
-                            title="تسجيل حضور جلسة"
+                            className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                           >
-                            📝 حضور
+                            ✅ حضور
                           </button>
-                          
-                          {/* زر التجديد */}
                           <button
-                            onClick={() => handleRenewal(session)}
-                            className="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700 transition"
-                            title="تجديد الاشتراك"
+                            onClick={() => handleRenew(session)}
+                            className="bg-purple-600 text-white px-3 py-1 rounded text-sm hover:bg-purple-700"
                           >
                             🔄 تجديد
                           </button>
+
                         </div>
                       </td>
                     </tr>
@@ -495,46 +581,12 @@ export default function PTPage() {
             </table>
           </div>
 
-          {sessions.length === 0 && (
+          {filteredSessions.length === 0 && (
             <div className="text-center py-12 text-gray-500">
-              لا توجد جلسات حاليًا
+              {searchTerm ? 'لا توجد نتائج للبحث' : 'لا توجد جلسات PT حالياً'}
             </div>
           )}
         </div>
-      )}
-
-      {receiptData && (
-        <div className="mt-6">
-          <button
-            onClick={() => setShowReceipt(true)}
-            className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
-          >
-            🖨️ طباعة آخر إيصال
-          </button>
-        </div>
-      )}
-
-      {showReceipt && receiptData && (
-        <ReceiptToPrint
-          receiptNumber={receiptData.receiptNumber}
-          type={receiptData.type}
-          amount={receiptData.amount}
-          details={receiptData.details}
-          date={receiptData.date}
-          paymentMethod={receiptData.paymentMethod}
-          onClose={() => setShowReceipt(false)}
-        />
-      )}
-
-      {showRenewalForm && selectedSession && (
-        <PTRenewalForm
-          session={selectedSession}
-          onSuccess={fetchSessions}
-          onClose={() => {
-            setShowRenewalForm(false)
-            setSelectedSession(null)
-          }}
-        />
       )}
     </div>
   )

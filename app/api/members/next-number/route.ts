@@ -4,21 +4,28 @@ import { prisma } from '../../../../lib/prisma'
 // جلب رقم العضوية التالي
 export async function GET() {
   try {
-    // جلب آخر رقم عضوية
+    // ✅ جلب آخر رقم عضوية (نستثني الأعضاء اللي memberNumber = null)
     const lastMember = await prisma.member.findFirst({
+      where: {
+        memberNumber: {
+          not: null // ✅ نستثني الـ Other
+        }
+      },
       orderBy: { memberNumber: 'desc' },
       select: { memberNumber: true }
     })
 
     // الرقم التالي
-    const nextNumber = lastMember ? lastMember.memberNumber + 1 : 1001
+    const nextNumber = lastMember?.memberNumber ? lastMember.memberNumber + 1 : 1001
+
+    console.log('📊 آخر رقم عضوية:', lastMember?.memberNumber, '➡️ الرقم التالي:', nextNumber)
 
     return NextResponse.json({ 
       nextNumber,
       message: 'تم جلب رقم العضوية التالي بنجاح'
     })
   } catch (error) {
-    console.error('Error fetching next member number:', error)
+    console.error('❌ Error fetching next member number:', error)
     return NextResponse.json({ 
       error: 'فشل جلب الرقم' 
     }, { status: 500 })
@@ -36,24 +43,28 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    // التحقق من عدم وجود رقم عضوية بهذا الرقم
+    const parsedNumber = parseInt(startNumber)
+
+    // ✅ التحقق من عدم وجود رقم عضوية بهذا الرقم (نستثني null)
     const existingMember = await prisma.member.findUnique({
-      where: { memberNumber: parseInt(startNumber) }
+      where: { memberNumber: parsedNumber }
     })
 
     if (existingMember) {
       return NextResponse.json({ 
-        error: `رقم العضوية ${startNumber} مستخدم بالفعل` 
+        error: `رقم العضوية ${parsedNumber} مستخدم بالفعل` 
       }, { status: 400 })
     }
 
+    console.log('✅ تم تحديث رقم البداية إلى:', parsedNumber)
+
     return NextResponse.json({ 
       success: true,
-      newNumber: parseInt(startNumber),
-      message: `تم تحديث رقم العضوية ليبدأ من ${startNumber}`
+      newNumber: parsedNumber,
+      message: `تم تحديث رقم العضوية ليبدأ من ${parsedNumber}`
     })
   } catch (error) {
-    console.error('Error updating member counter:', error)
+    console.error('❌ Error updating member counter:', error)
     return NextResponse.json({ 
       error: 'فشل تحديث رقم العضوية' 
     }, { status: 500 })

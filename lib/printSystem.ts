@@ -1,4 +1,4 @@
-// نظام طباعة موحد - كل الإيصالات بنفس الشكل
+// نظام طباعة موحد - مع إضافة اسم الموظف
 
 interface ReceiptData {
   receiptNumber: number
@@ -58,6 +58,9 @@ function generateReceiptHTML(data: ReceiptData): string {
   // طريقة الدفع
   const paymentMethod = details.paymentMethod || 'cash'
   const paymentMethodLabel = getPaymentMethodLabel(paymentMethod)
+
+  // اسم الموظف
+  const staffName = details.staffName || ''
 
   return `
 <!DOCTYPE html>
@@ -131,6 +134,17 @@ function generateReceiptHTML(data: ReceiptData): string {
       padding: 6px 12px;
       border-radius: 6px;
       font-size: 13px;
+      font-weight: bold;
+      display: inline-block;
+      margin: 8px 0;
+    }
+    
+    .staff-badge {
+      background: #f59e0b;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
       font-weight: bold;
       display: inline-block;
       margin: 8px 0;
@@ -252,8 +266,10 @@ function generateReceiptHTML(data: ReceiptData): string {
 </head>
 <body>
   <div class="header">
-   
-    <div> <img src='icon.png'  alt="logo" className='w-6 h-6'/>  <h1>X GYM</h1></div>
+    <div>
+      <img src='icon.png' alt="logo" style="width: 24px; height: 24px; display: inline-block;"/>
+      <h1>X GYM</h1>
+    </div>
     <p>إيصال استلام</p>
     <p>${type}</p>
     
@@ -263,6 +279,8 @@ function generateReceiptHTML(data: ReceiptData): string {
     }
     
     <div class="payment-method-badge">${paymentMethodLabel}</div>
+    
+    ${staffName ? `<div class="staff-badge">👷 ${staffName}</div>` : ''}
   </div>
 
   <div class="info-row">
@@ -357,8 +375,8 @@ function generateReceiptHTML(data: ReceiptData): string {
     ` : ''}
     
     ${details.staffName ? `
-      <div class="detail-item">
-        <strong>الموظف:</strong> ${details.staffName}
+      <div>
+        <strong> الموظف المسجل:</strong> ${details.staffName}
       </div>
     ` : ''}
     
@@ -387,8 +405,6 @@ function generateReceiptHTML(data: ReceiptData): string {
   </div>
 
   <div class="footer">
-
-
     ${isRenewal 
       ? '<p style="color: #10b981; font-weight: bold;">تم تجديد اشتراكك بنجاح 🎉</p>' 
       : '<p style="color: #3b82f6; font-weight: bold;">مرحباً بك معنا 🎉</p>'

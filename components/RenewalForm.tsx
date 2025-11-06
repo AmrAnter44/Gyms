@@ -37,6 +37,7 @@ interface Receipt {
     startDate?: string
     expiryDate?: string
     subscriptionDays?: number
+    staffName?: string // ✅ إضافة اسم الموظف
     [key: string]: any
   }
 }
@@ -57,6 +58,7 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
   const [expiryDate, setExpiryDate] = useState('')
   const [notes, setNotes] = useState(member.notes || '')
   const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [staffName, setStaffName] = useState('') // ✅ إضافة اسم الموظف
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -69,7 +71,6 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
     return diffDays > 0 ? diffDays : 0
   }
 
-  // ✅ دالة لحساب تاريخ الانتهاء من عدد الأشهر
   const calculateExpiryFromMonths = (months: number) => {
     if (!startDate) return
     
@@ -80,7 +81,6 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
     setExpiryDate(expiry.toISOString().split('T')[0])
   }
 
-  // ✅ حساب المبلغ المدفوع (integers فقط)
   const calculatePaidAmount = () => {
     const price = parseInt(subscriptionPrice) || 0
     const remaining = parseInt(remainingAmount) || 0
@@ -90,6 +90,12 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
   const handleRenewal = async () => {
     if (!subscriptionPrice || parseInt(subscriptionPrice) <= 0) {
       setError('⚠️ يرجى إدخال سعر اشتراك صحيح')
+      return
+    }
+
+    // ✅ التحقق من اسم الموظف
+    if (!staffName.trim()) {
+      setError('⚠️ يرجى إدخال اسم الموظف')
       return
     }
 
@@ -109,7 +115,6 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
     try {
       console.log('📄 إرسال طلب التجديد...')
       
-      // ✅ تحويل كل الأرقام لـ integers
       const response = await fetch('/api/members/renew', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,7 +128,8 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
           startDate,
           expiryDate,
           notes,
-          paymentMethod
+          paymentMethod,
+          staffName: staffName.trim() // ✅ إرسال اسم الموظف
         })
       })
 
@@ -148,6 +154,10 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
       setLoading(false)
     }
   }
+
+  const duration = calculateDays(startDate, expiryDate)
+  const totalAmount = subscriptionPrice ? parseInt(subscriptionPrice) : 0
+  const totalSessions = (member.freePTSessions || 0) + (parseInt(freePTSessions) || 0)
 
   return (
     <div 
@@ -212,7 +222,7 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
           <div className="bg-gray-50 p-4 rounded-lg">
             <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
               <span>💰</span>
-              <span>تفاصيل الاشتراك</span>
+              <span>تفاصيل التجديد</span>
             </h4>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -242,6 +252,21 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
                   className="w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:border-blue-500"
                   placeholder="0"
                   min="0"
+                />
+              </div>
+
+              {/* ✅ اسم الموظف */}
+              <div className="col-span-2">
+                <label className="block text-sm font-medium mb-2">
+                  اسم الموظف <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={staffName}
+                  onChange={(e) => setStaffName(e.target.value)}
+                  className="w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:border-blue-500"
+                  placeholder="اسم الموظف المجدد"
                 />
               </div>
             </div>
@@ -371,12 +396,12 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
               </div>
             </div>
 
-            {startDate && expiryDate && (
+            {duration > 0 && expiryDate && (
               <div className="bg-blue-50 border-2 border-blue-300 rounded-lg p-3">
                 <p className="text-sm text-blue-800">
-                  ⏱️ <strong>مدة الاشتراك:</strong> {calculateDays(startDate, expiryDate)} يوم
-                  {calculateDays(startDate, expiryDate) >= 30 && 
-                    ` (${Math.floor(calculateDays(startDate, expiryDate) / 30)} ${Math.floor(calculateDays(startDate, expiryDate) / 30) === 1 ? 'شهر' : 'أشهر'})`
+                  ⏱️ <strong>مدة الاشتراك:</strong> {duration} يوم
+                  {duration >= 30 && 
+                    ` (${Math.floor(duration / 30)} ${Math.floor(duration / 30) === 1 ? 'شهر' : 'أشهر'})`
                   }
                 </p>
               </div>
@@ -407,10 +432,40 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
             />
           </div>
 
+          <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-6">
+            <h4 className="font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <span>📊</span>
+              <span>ملخص التجديد</span>
+            </h4>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-600">الجلسات الحالية:</span>
+                <span className="font-bold">{member.freePTSessions || 0} جلسة</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">الجلسات الجديدة:</span>
+                <span className="font-bold text-green-600">+ {parseInt(freePTSessions) || 0} جلسة</span>
+              </div>
+              <div className="border-t-2 border-gray-300 pt-3">
+                <div className="flex justify-between text-xl">
+                  <span className="font-bold">الإجمالي بعد التجديد:</span>
+                  <span className="font-bold text-orange-600">{totalSessions} جلسة</span>
+                </div>
+              </div>
+              <div className="bg-green-100 border-r-4 border-green-500 p-3 rounded mt-3">
+                <div className="flex justify-between text-lg">
+                  <span className="font-bold text-gray-800">المبلغ المدفوع:</span>
+                  <span className="font-bold text-green-600">{calculatePaidAmount()} ج.م</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="flex gap-3 sticky bottom-0 bg-white pt-4 border-t">
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || duration <= 0}
               className="flex-1 bg-gradient-to-r from-blue-600 to-blue-700 text-white py-4 rounded-lg hover:from-blue-700 hover:to-blue-800 disabled:from-gray-400 disabled:to-gray-400 font-bold text-lg shadow-lg transition-all"
             >
               {loading ? (

@@ -29,18 +29,32 @@ export default function MemberForm({ onSuccess }: MemberFormProps) {
     notes: '',
     startDate: new Date().toISOString().split('T')[0],
     expiryDate: '',
-    paymentMethod: 'cash' as 'cash' | 'visa' | 'instapay' | 'wallet'
+    paymentMethod: 'cash' as 'cash' | 'visa' | 'instapay' | 'wallet',
+    staffName: '',
+    isOther: false
   })
 
+  // جلب رقم العضوية التالي فقط عند التحميل الأول
   useEffect(() => {
     fetch('/api/members/next-number')
       .then(res => res.json())
       .then(data => {
+        console.log('📊 رقم العضوية التالي:', data.nextNumber)
         setNextMemberNumber(data.nextNumber)
         setFormData(prev => ({ ...prev, memberNumber: data.nextNumber.toString() }))
       })
-      .catch(err => console.error('Error fetching next number:', err))
-  }, [])
+      .catch(err => console.error('❌ خطأ في جلب رقم العضوية:', err))
+  }, []) // [] فقط للتحميل الأول
+
+  // ✅ معالجة تغيير تشيك بوكس Other
+  const handleOtherChange = (checked: boolean) => {
+    console.log('🔄 تغيير Other:', checked)
+    setFormData(prev => ({
+      ...prev,
+      isOther: checked,
+      memberNumber: checked ? '' : (nextMemberNumber?.toString() || '')
+    }))
+  }
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -96,6 +110,13 @@ export default function MemberForm({ onSuccess }: MemberFormProps) {
     setLoading(true)
     setMessage('')
 
+    // ✅ التحقق من اسم الموظف
+    if (!formData.staffName.trim()) {
+      setMessage('❌ يرجى إدخال اسم الموظف')
+      setLoading(false)
+      return
+    }
+
     if (formData.startDate && formData.expiryDate) {
       const start = new Date(formData.startDate)
       const end = new Date(formData.expiryDate)
@@ -110,13 +131,24 @@ export default function MemberForm({ onSuccess }: MemberFormProps) {
     // ✅ تحويل كل الأرقام لـ integers
     const cleanedData = {
       ...formData,
-      memberNumber: formData.memberNumber ? parseInt(formData.memberNumber) : undefined,
+      // ✅ إرسال isOther بشكل صريح
+      isOther: formData.isOther,
+      // ✅ إذا كان Other، لا نرسل memberNumber أصلاً، وإلا نحوله لـ integer
+      memberNumber: formData.isOther 
+        ? null 
+        : (formData.memberNumber ? parseInt(formData.memberNumber) : nextMemberNumber),
       inBodyScans: parseInt(formData.inBodyScans.toString()),
       invitations: parseInt(formData.invitations.toString()),
       freePTSessions: parseInt(formData.freePTSessions.toString()),
       subscriptionPrice: parseInt(formData.subscriptionPrice.toString()),
-      remainingAmount: parseInt(formData.remainingAmount.toString())
+      remainingAmount: parseInt(formData.remainingAmount.toString()),
+      staffName: formData.staffName.trim()
     }
+
+    console.log('📤 إرسال البيانات:', {
+      isOther: cleanedData.isOther,
+      memberNumber: cleanedData.memberNumber
+    })
 
     try {
       const response = await fetch('/api/members', {
@@ -157,13 +189,14 @@ export default function MemberForm({ onSuccess }: MemberFormProps) {
               inBodyScans: cleanedData.inBodyScans,
               invitations: cleanedData.invitations,
               freePTSessions: cleanedData.freePTSessions,
-              paymentMethod: formData.paymentMethod
+              paymentMethod: formData.paymentMethod,
+              staffName: formData.staffName
             }
 
             // طباعة الإيصال
             printReceiptFromData(
               data.receipt.receiptNumber,
-              'Member', // نوع الإيصال
+              'Member',
               cleanedData.subscriptionPrice,
               receiptDetails,
               new Date(data.receipt.createdAt),
@@ -207,21 +240,47 @@ export default function MemberForm({ onSuccess }: MemberFormProps) {
           <span>المعلومات الأساسية</span>
         </h3>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">رقم العضوية</label>
+        {/* ✅ رقم العضوية مع تشيك بوكس Other */}
+        <div className="mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium">
+              رقم العضوية {!formData.isOther && '*'}
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.isOther}
+                onChange={(e) => handleOtherChange(e.target.checked)}
+                className="w-4 h-4 rounded border-gray-300"
+              />
+              <span className="text-sm font-medium text-gray-700">Other (بدون رقم)</span>
+            </label>
+          </div>
+          
+          {formData.isOther ? (
+            <div className="w-full px-3 py-2 border-2 border-dashed rounded-lg bg-gray-100 text-gray-500 text-center">
+              لا يوجد رقم عضوية (Other)
+            </div>
+          ) : (
             <input
               type="number"
+              required={!formData.isOther}
               value={formData.memberNumber}
               onChange={(e) => setFormData({ ...formData, memberNumber: e.target.value })}
-              className="w-full px-3 py-2 border-2 rounded-lg font-bold text-blue-600"
-              placeholder={nextMemberNumber ? `التالي: ${nextMemberNumber}` : 'تلقائي'}
+              className="w-full px-3 py-2 border-2 rounded-lg"
+              placeholder="مثال: 1001"
+              disabled={formData.isOther}
             />
+          )}
+          
+          {!formData.isOther && nextMemberNumber && (
             <p className="text-xs text-gray-500 mt-1">
-              {nextMemberNumber && `💡 الرقم التالي المتاح: ${nextMemberNumber}`}
+              💡 الرقم التالي المقترح: {nextMemberNumber}
             </p>
-          </div>
+          )}
+        </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">الاسم *</label>
             <input
@@ -230,37 +289,54 @@ export default function MemberForm({ onSuccess }: MemberFormProps) {
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               className="w-full px-3 py-2 border-2 rounded-lg"
-              placeholder="الاسم الكامل"
+              placeholder="أحمد محمد"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">رقم الهاتف *</label>
+            <label className="block text-sm font-medium mb-1">رقم الهاتف</label>
             <input
               type="tel"
-              required
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               className="w-full px-3 py-2 border-2 rounded-lg"
-              placeholder="01xxxxxxxxx"
+              placeholder="01234567890"
+              dir="ltr"
             />
           </div>
         </div>
+
+        {/* ✅ حقل اسم الموظف */}
+        <div className="mt-4">
+          <label className="block text-sm font-medium mb-1">اسم الموظف *</label>
+          <input
+            type="text"
+            required
+            value={formData.staffName}
+            onChange={(e) => setFormData({ ...formData, staffName: e.target.value })}
+            className="w-full px-3 py-2 border-2 rounded-lg"
+            placeholder="محمد علي"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            👤 اسم الموظف الذي قام بإضافة العضو
+          </p>
+        </div>
       </div>
 
+      {/* صورة البروفايل */}
       <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4">
         <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
-          <span>📸</span>
-          <span>صورة العضو (اختياري)</span>
+          <span>📷</span>
+          <span>صورة البروفايل</span>
         </h3>
 
         <div className="flex flex-col items-center gap-4">
           {imagePreview ? (
             <div className="relative">
-              <img 
-                src={imagePreview} 
-                alt="Preview" 
-                className="w-32 h-32 rounded-full object-cover border-4 border-purple-300"
+              <img
+                src={imagePreview}
+                alt="Preview"
+                className="w-32 h-32 rounded-full object-cover border-4 border-purple-400"
               />
               <button
                 type="button"

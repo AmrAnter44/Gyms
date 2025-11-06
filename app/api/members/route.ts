@@ -1,4 +1,4 @@
-// app/api/members/route.ts - بدون أرقام عشرية نهائياً
+// app/api/members/route.ts - إصلاح مشكلة Other
 import { NextResponse } from 'next/server'
 import { prisma } from '../../../lib/prisma'
 
@@ -74,21 +74,55 @@ export async function POST(request: Request) {
       notes, 
       startDate, 
       expiryDate, 
-      paymentMethod 
+      paymentMethod,
+      staffName,
+      isOther // ✅ استقبال isOther
     } = body
 
-    console.log('📝 إضافة عضو جديد:', { memberNumber, name, profileImage })
+    console.log('📝 إضافة عضو جديد:', { 
+      memberNumber, 
+      name, 
+      profileImage, 
+      isOther, 
+      staffName 
+    })
+
+    // ✅ التحقق من اسم الموظف
+    if (!staffName || !staffName.trim()) {
+      return NextResponse.json(
+        { error: 'اسم الموظف مطلوب' },
+        { status: 400 }
+      )
+    }
 
     // ✅ تحويل كل الأرقام لـ integers
-    const cleanMemberNumber = memberNumber ? parseInt(memberNumber.toString()) : undefined
+    // إذا كان isOther = true، نخلي memberNumber = null
+    let cleanMemberNumber = null
+    
+    if (isOther === true) {
+      // Other: بدون رقم عضوية
+      cleanMemberNumber = null
+      console.log('✅ عضو Other (بدون رقم عضوية)')
+    } else {
+      // عضو عادي: لازم رقم عضوية
+      if (!memberNumber) {
+        return NextResponse.json(
+          { error: 'رقم العضوية مطلوب' },
+          { status: 400 }
+        )
+      }
+      cleanMemberNumber = parseInt(memberNumber.toString())
+      console.log('✅ عضو عادي برقم:', cleanMemberNumber)
+    }
+    
     const cleanInBodyScans = parseInt((inBodyScans || 0).toString())
     const cleanInvitations = parseInt((invitations || 0).toString())
     const cleanFreePTSessions = parseInt((freePTSessions || 0).toString())
     const cleanSubscriptionPrice = parseInt(subscriptionPrice.toString())
     const cleanRemainingAmount = parseInt((remainingAmount || 0).toString())
 
-    // التحقق من أن رقم العضوية غير مستخدم
-    if (cleanMemberNumber) {
+    // التحقق من أن رقم العضوية غير مستخدم (إذا لم يكن Other)
+    if (cleanMemberNumber !== null) {
       const existingMember = await prisma.member.findUnique({
         where: { memberNumber: cleanMemberNumber }
       })
@@ -118,7 +152,7 @@ export async function POST(request: Request) {
     // إنشاء العضو
     const member = await prisma.member.create({
       data: {
-        memberNumber: cleanMemberNumber,
+        memberNumber: cleanMemberNumber, // null للـ Other
         name,
         phone,
         profileImage,
@@ -133,7 +167,7 @@ export async function POST(request: Request) {
       },
     })
 
-    console.log('✅ تم إنشاء العضو:', member.id, 'صورة:', member.profileImage)
+    console.log('✅ تم إنشاء العضو:', member.id, 'رقم العضوية:', member.memberNumber, 'صورة:', member.profileImage)
 
     // إنشاء إيصال دائماً
     let receiptData = null
@@ -170,8 +204,9 @@ export async function POST(request: Request) {
           type: 'Member',
           amount: paidAmount,
           paymentMethod: paymentMethod || 'cash',
+          staffName: staffName.trim(),
           itemDetails: JSON.stringify({
-            memberNumber: cleanMemberNumber,
+            memberNumber: cleanMemberNumber, // null للـ Other
             memberName: name,
             subscriptionPrice: cleanSubscriptionPrice,
             paidAmount: paidAmount,
@@ -182,6 +217,8 @@ export async function POST(request: Request) {
             startDate: startDate,
             expiryDate: expiryDate,
             subscriptionDays: subscriptionDays,
+            staffName: staffName.trim(),
+            isOther: isOther === true, // ✅ حفظ في التفاصيل
           }),
           memberId: member.id,
         },
@@ -202,6 +239,7 @@ export async function POST(request: Request) {
         receiptNumber: receipt.receiptNumber,
         amount: receipt.amount,
         paymentMethod: receipt.paymentMethod,
+        staffName: receipt.staffName,
         createdAt: receipt.createdAt,
         itemDetails: JSON.parse(receipt.itemDetails)
       }
@@ -235,7 +273,7 @@ export async function PUT(request: Request) {
     
     // ✅ تحويل كل الأرقام لـ integers
     if (data.memberNumber !== undefined) {
-      updateData.memberNumber = parseInt(data.memberNumber.toString())
+      updateData.memberNumber = data.memberNumber ? parseInt(data.memberNumber.toString()) : null
     }
     if (data.inBodyScans !== undefined) {
       updateData.inBodyScans = parseInt(data.inBodyScans.toString())
