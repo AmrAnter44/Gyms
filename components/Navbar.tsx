@@ -236,12 +236,11 @@ export default function Navbar() {
                 setSearchMessage(null)
                 setTimeout(() => searchInputRef.current?.focus(), 100)
               }}
-              className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition flex items-center gap-2 font-bold animate-pulse hover:animate-none"
-              title="اضغط Ctrl+K للبحث السريع"
+              className="px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition flex items-center gap-2 font-bold"
             >
               <span>🔍</span>
-              <span className="hidden sm:inline">بحث سريع</span>
-              <kbd className="hidden sm:inline-block px-2 py-1 bg-white/30 rounded text-sm font-bold border border-white/40">Ctrl+K</kbd>
+              <span className="hidden md:inline">بحث سريع</span>
+              <kbd className="hidden md:inline-block px-2 py-1 bg-white/20 rounded text-xs">Ctrl+K</kbd>
             </button>
             
             {/* Navigation Links */}
@@ -340,22 +339,8 @@ export default function Navbar() {
               )}
 
               {/* Hint */}
-              <div className="mt-6 text-center text-sm text-gray-500 bg-gray-50 rounded-lg p-4 border-2 border-gray-200">
-                <p className="font-bold text-lg mb-2">⌨️ اختصارات لوحة المفاتيح:</p>
-                <div className="flex justify-center gap-4 flex-wrap">
-                  <span>
-                    <kbd className="px-3 py-1 bg-blue-100 text-blue-700 rounded font-bold border border-blue-300">Ctrl+K</kbd>
-                    <span className="mr-2">فتح البحث</span>
-                  </span>
-                  <span>
-                    <kbd className="px-3 py-1 bg-green-100 text-green-700 rounded font-bold border border-green-300">Enter</kbd>
-                    <span className="mr-2">بحث</span>
-                  </span>
-                  <span>
-                    <kbd className="px-3 py-1 bg-red-100 text-red-700 rounded font-bold border border-red-300">ESC</kbd>
-                    <span className="mr-2">إغلاق</span>
-                  </span>
-                </div>
+              <div className="mt-6 text-center text-sm text-gray-500">
+                <p>💡 اضغط <kbd className="px-2 py-1 bg-gray-200 rounded">Enter</kbd> للبحث أو <kbd className="px-2 py-1 bg-gray-200 rounded">ESC</kbd> للإغلاق</p>
               </div>
             </div>
           </div>

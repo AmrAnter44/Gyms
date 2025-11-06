@@ -86,13 +86,7 @@ export default function HomePage() {
       href: '/receipts',
       color: 'bg-indigo-500',
     },
-    {
-      title: 'البحث السريع',
-      icon: '🔍',
-      description: 'بحث فوري عن الأعضاء والاشتراكات',
-      href: '/search',
-      color: 'bg-red-500',
-    },
+    
     {
       title: 'سجل الدعوات',
       icon: '🎟️',
@@ -130,15 +124,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-500 text-sm">إيرادات اليوم</p>
-              <p className="text-3xl font-bold">{stats.todayRevenue.toFixed(0)} ج.م</p>
-            </div>
-            <div className="text-4xl">💰</div>
-          </div>
-        </div>
+
         
         <div className="bg-white p-6 rounded-lg shadow-md">
           <div className="flex items-center justify-between">
