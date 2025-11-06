@@ -187,8 +187,9 @@ export default function SearchPage() {
       const membersRes = await fetch('/api/members')
       const members = await membersRes.json()
       
+      // ✅ البحث برقم العضوية (يستثني Other لأنهم memberNumber = null)
       const filteredMembers = members.filter((m: any) => 
-        m.memberNumber.toString() === memberId.trim()
+        m.memberNumber !== null && m.memberNumber.toString() === memberId.trim()
       )
       
       filteredMembers.forEach((member: any) => {
@@ -512,9 +513,17 @@ export default function SearchPage() {
                               <h3 className="text-3xl font-bold mt-3">{result.data.name}</h3>
                             </div>
                           </div>
-                          <span className="text-5xl font-bold text-blue-600">
-                            #{result.data.memberNumber}
-                          </span>
+                          {/* ✅ عرض رقم العضوية فقط إذا كان موجود (ليس Other) */}
+                          {result.data.memberNumber !== null && (
+                            <span className="text-5xl font-bold text-blue-600">
+                              #{result.data.memberNumber}
+                            </span>
+                          )}
+                          {result.data.memberNumber === null && (
+                            <span className="text-2xl font-bold text-gray-500 bg-gray-100 px-4 py-2 rounded-lg">
+                              Other
+                            </span>
+                          )}
                         </div>
                         
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
