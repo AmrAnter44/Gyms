@@ -141,34 +141,38 @@ export default function StaffPage() {
   }
 
   // ✅ معالجة السكان بالرقم
-  const handleScan = async (staffCode: string) => {
-    try {
-      const response = await fetch('/api/attendance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ staffCode: staffCode.trim() }),
-      })
+const handleScan = async (staffCode: string) => {
+  try {
+    // 🟢 لو الكود بيبدأ بـ s أو S شيله
+    const cleanCode = staffCode.trim().replace(/^s/i, '');
 
-      const data = await response.json()
+    const response = await fetch('/api/attendance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ staffCode: cleanCode }),
+    });
 
-      if (response.ok) {
-        playSuccessSound()
-        setScanMessage(data.message)
-        setLastScanTime(new Date())
-        fetchTodayAttendance()
-        setTimeout(() => setScanMessage(''), 5000)
-      } else {
-        playErrorSound()
-        setScanMessage(`❌ ${data.error || 'فشل تسجيل الحضور'}`)
-        setTimeout(() => setScanMessage(''), 5000)
-      }
-    } catch (error) {
-      console.error('Scan error:', error)
-      playErrorSound()
-      setScanMessage('❌ حدث خطأ في تسجيل الحضور')
-      setTimeout(() => setScanMessage(''), 5000)
+    const data = await response.json();
+
+    if (response.ok) {
+      playSuccessSound();
+      setScanMessage(data.message);
+      setLastScanTime(new Date());
+      fetchTodayAttendance();
+      setTimeout(() => setScanMessage(''), 5000);
+    } else {
+      playErrorSound();
+      setScanMessage(`❌ ${data.error || 'فشل تسجيل الحضور'}`);
+      setTimeout(() => setScanMessage(''), 5000);
     }
+  } catch (error) {
+    console.error('Scan error:', error);
+    playErrorSound();
+    setScanMessage('❌ حدث خطأ في تسجيل الحضور');
+    setTimeout(() => setScanMessage(''), 5000);
   }
+};
+
 
   // ✅ معالجة إدخال Scanner
   const handleScannerInput = (e: React.KeyboardEvent<HTMLInputElement>) => {

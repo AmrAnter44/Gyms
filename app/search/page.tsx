@@ -20,6 +20,7 @@ export default function SearchPage() {
   const [loading, setLoading] = useState(false)
   const [searched, setSearched] = useState(false)
   const [lastSearchTime, setLastSearchTime] = useState<Date | null>(null)
+  const [attendanceMessage, setAttendanceMessage] = useState<{type: 'success' | 'error', text: string, staff?: any} | null>(null)
   const memberIdRef = useRef<HTMLInputElement>(null)
   const nameRef = useRef<HTMLInputElement>(null)
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -179,17 +180,85 @@ export default function SearchPage() {
       return
     }
 
+    const inputValue = memberId.trim()
+    
+    // ✅ فحص إذا كان الإدخال يبدأ بحرف 's' - تسجيل حضور موظف
+    if (inputValue.toLowerCase().startsWith('s')) {
+      const staffCode = inputValue.substring(1) // إزالة حرف 's' والحصول على الرقم
+      
+      if (!staffCode || isNaN(parseInt(staffCode))) {
+        playAlarmSound()
+        setAttendanceMessage({
+          type: 'error',
+          text: '❌ رقم الموظف غير صحيح. استخدم الصيغة: s22'
+        })
+        setMemberId('')
+        setTimeout(() => setAttendanceMessage(null), 4000)
+        return
+      }
+
+      setLoading(true)
+      setAttendanceMessage(null)
+      
+      try {
+        // 🔧 تسجيل حضور الموظف
+        const response = await fetch('/api/attendance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ staffCode: staffCode.trim() }),
+        })
+
+        const data = await response.json()
+
+        if (response.ok) {
+          playSuccessSound()
+          setAttendanceMessage({
+            type: 'success',
+            text: data.message,
+            staff: data.staff
+          })
+          setTimeout(() => setAttendanceMessage(null), 5000)
+        } else {
+          playAlarmSound()
+          setAttendanceMessage({
+            type: 'error',
+            text: data.error || 'فشل تسجيل الحضور'
+          })
+          setTimeout(() => setAttendanceMessage(null), 5000)
+        }
+      } catch (error) {
+        console.error('Attendance error:', error)
+        playAlarmSound()
+        setAttendanceMessage({
+          type: 'error',
+          text: 'حدث خطأ في تسجيل الحضور'
+        })
+        setTimeout(() => setAttendanceMessage(null), 5000)
+      } finally {
+        setLoading(false)
+        setMemberId('')
+        setTimeout(() => {
+          memberIdRef.current?.focus()
+          memberIdRef.current?.select()
+        }, 500)
+      }
+      
+      return // إنهاء الدالة بعد تسجيل الحضور
+    }
+
+    // ✅ البحث العادي عن عضو برقم العضوية
     setLoading(true)
     setSearched(true)
+    setAttendanceMessage(null)
     const foundResults: SearchResult[] = []
 
     try {
       const membersRes = await fetch('/api/members')
       const members = await membersRes.json()
       
-      // ✅ البحث برقم العضوية (يستثني Other لأنهم memberNumber = null)
+      // البحث برقم العضوية (يستثني Other لأنهم memberNumber = null)
       const filteredMembers = members.filter((m: any) => 
-        m.memberNumber !== null && m.memberNumber.toString() === memberId.trim()
+        m.memberNumber !== null && m.memberNumber.toString() === inputValue
       )
       
       filteredMembers.forEach((member: any) => {
@@ -200,10 +269,10 @@ export default function SearchPage() {
       setLastSearchTime(new Date())
 
       if (foundResults.length > 0) {
-        // 🆕 فحص حالة العضو وتشغيل الصوت المناسب
+        // فحص حالة العضو وتشغيل الصوت المناسب
         checkMemberStatusAndPlaySound(foundResults[0].data)
       } else {
-        // 🆕 لم يتم العثور على نتائج - صوت إنذار
+        // لم يتم العثور على نتائج - صوت إنذار
         playAlarmSound()
       }
 
@@ -224,12 +293,17 @@ export default function SearchPage() {
   const handleSearchByName = async () => {
     if (!searchName.trim() && !searchPhone.trim()) {
       playAlarmSound()
-      alert('يرجى إدخال الاسم أو رقم الهاتف للبحث')
+      setAttendanceMessage({
+        type: 'error',
+        text: 'يرجى إدخال الاسم أو رقم الهاتف للبحث'
+      })
+      setTimeout(() => setAttendanceMessage(null), 3000)
       return
     }
 
     setLoading(true)
     setSearched(true)
+    setAttendanceMessage(null)
     const foundResults: SearchResult[] = []
 
     try {
@@ -335,6 +409,9 @@ export default function SearchPage() {
           <strong className="text-yellow-600"> صوت أصفر ⚠️:</strong> قريب من الانتهاء | 
           <strong className="text-red-600"> صوت أحمر 🚨:</strong> منتهي أو غير موجود
         </p>
+        <p className="text-sm text-blue-600 mt-2 font-bold">
+          👷 <strong>تسجيل حضور موظف:</strong> اكتب <code className="bg-blue-100 px-2 py-1 rounded">s22</code> (حرف s + الرقم) للتسجيل التلقائي
+        </p>
       </div>
 
       <div className="bg-white p-4 rounded-2xl shadow-lg mb-6 border-4 border-blue-200">
@@ -351,7 +428,7 @@ export default function SearchPage() {
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            🎯 البحث برقم العضوية (ID)
+            🎯 البحث برقم العضوية (ID) أو تسجيل حضور (s22)
           </button>
           <button
             onClick={() => {
@@ -375,8 +452,57 @@ export default function SearchPage() {
           <div className="mb-6">
             <label className=" text-2xl font-bold mb-4 text-blue-800 flex items-center gap-2">
               <span>🎯</span>
-              <span>البحث برقم العضوية (ID)</span>
+              <span>البحث برقم العضوية أو تسجيل حضور موظف</span>
             </label>
+            <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-4 mb-4">
+              <p className="text-blue-800 font-bold mb-2">📝 كيفية الاستخدام:</p>
+              <ul className="text-blue-700 space-y-1 text-sm">
+                <li>• <strong>للبحث عن عضو:</strong> اكتب الرقم مباشرة (مثال: <code className="bg-white px-2 py-1 rounded">1001</code>)</li>
+                <li>• <strong>لتسجيل حضور موظف:</strong> اكتب حرف s ثم الرقم (مثال: <code className="bg-white px-2 py-1 rounded">s22</code>)</li>
+              </ul>
+            </div>
+            
+            {/* 🆕 رسالة تسجيل الحضور */}
+            {attendanceMessage && (
+              <div className={`mb-4 p-6 rounded-2xl border-4 animate-slideDown ${
+                attendanceMessage.type === 'success' 
+                  ? 'bg-gradient-to-r from-green-50 to-green-100 border-green-500' 
+                  : 'bg-gradient-to-r from-red-50 to-red-100 border-red-500'
+              }`}>
+                <div className="flex items-start gap-4">
+                  <div className="text-6xl">
+                    {attendanceMessage.type === 'success' ? '✅' : '🚨'}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className={`text-2xl font-bold mb-2 ${
+                      attendanceMessage.type === 'success' ? 'text-green-800' : 'text-red-800'
+                    }`}>
+                      {attendanceMessage.type === 'success' ? 'تم التسجيل بنجاح!' : 'خطأ في التسجيل'}
+                    </h3>
+                    <p className={`text-xl font-bold ${
+                      attendanceMessage.type === 'success' ? 'text-green-700' : 'text-red-700'
+                    }`}>
+                      {attendanceMessage.text}
+                    </p>
+                    {attendanceMessage.staff && (
+                      <div className="mt-4 bg-white/50 rounded-xl p-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-sm text-gray-600">الموظف</p>
+                            <p className="text-lg font-bold text-gray-800">{attendanceMessage.staff.name}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">الوظيفة</p>
+                            <p className="text-lg font-bold text-gray-800">{attendanceMessage.staff.position || '-'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="flex gap-3">
               <input
                 ref={memberIdRef}
@@ -385,7 +511,7 @@ export default function SearchPage() {
                 onChange={(e) => setMemberId(e.target.value)}
                 onKeyPress={handleIdKeyPress}
                 className="flex-1 px-6 py-6 border-4 border-green-300 rounded-xl text-4xl font-bold text-center focus:border-green-600 focus:ring-4 focus:ring-green-200 transition"
-                placeholder="اسكن أو اكتب رقم العضوية..."
+                placeholder="1001 أو s22"
                 autoFocus
               />
               <button
@@ -393,7 +519,7 @@ export default function SearchPage() {
                 disabled={loading || !memberId.trim()}
                 className="px-8 py-6 bg-green-600 text-white text-xl font-bold rounded-xl hover:bg-green-700 disabled:bg-gray-400 transition"
               >
-                🔍 بحث
+                {loading ? '⏳' : '🔍'} بحث
               </button>
             </div>
             <p className="text-sm text-gray-500 mt-2">
@@ -409,6 +535,15 @@ export default function SearchPage() {
             <span>👤</span>
             <span>البحث بالاسم والرقم</span>
           </label>
+          
+          {/* 🆕 رسالة الخطأ */}
+          {attendanceMessage && (
+            <div className="mb-4 p-4 rounded-xl border-2 bg-red-50 border-red-500 animate-slideDown">
+              <p className="text-lg font-bold text-red-700">
+                {attendanceMessage.text}
+              </p>
+            </div>
+          )}
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
@@ -470,7 +605,7 @@ export default function SearchPage() {
               <p className="text-3xl font-bold text-red-600 mb-3">لم يتم العثور على نتائج</p>
               <p className="text-xl text-red-500">
                 {searchMode === 'id' 
-                  ? `للبحث عن رقم العضوية "${memberId}"`
+                  ? `للبحث عن "${memberId}"`
                   : `للبحث عن "${searchName || searchPhone}"`
                 }
               </p>
@@ -667,8 +802,23 @@ export default function SearchPage() {
           }
         }
         
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
         .animate-fadeIn {
           animation: fadeIn 0.3s ease-out;
+        }
+        
+        .animate-slideDown {
+          animation: slideDown 0.4s ease-out;
         }
       `}</style>
     </div>
