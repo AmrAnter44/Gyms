@@ -35,17 +35,36 @@ export default function MemberForm({ onSuccess }: MemberFormProps) {
   })
 
   // جلب رقم العضوية التالي فقط عند التحميل الأول
-  useEffect(() => {
-    fetch('/api/members/next-number')
-      .then(res => res.json())
-      .then(data => {
-        console.log('📊 رقم العضوية التالي:', data.nextNumber)
+// جلب رقم العضوية التالي فقط عند التحميل الأول
+useEffect(() => {
+  const fetchNextNumber = async () => {
+    try {
+      const response = await fetch('/api/members/next-number')
+      const data = await response.json()
+      
+      console.log('📊 استجابة API:', data)
+      
+      if (data.nextNumber !== undefined && data.nextNumber !== null) {
         setNextMemberNumber(data.nextNumber)
         setFormData(prev => ({ ...prev, memberNumber: data.nextNumber.toString() }))
-      })
-      .catch(err => console.error('❌ خطأ في جلب رقم العضوية:', err))
-  }, []) // [] فقط للتحميل الأول
-
+      } else {
+        // استخدام رقم افتراضي
+        console.warn('⚠️ لم يتم إرجاع nextNumber، استخدام 1001')
+        setNextMemberNumber(1001)
+        setFormData(prev => ({ ...prev, memberNumber: '1001' }))
+      }
+    } catch (error) {
+      console.error('❌ خطأ في جلب رقم العضوية:', error)
+      // استخدام رقم افتراضي في حالة الخطأ
+      setNextMemberNumber(1001)
+      setFormData(prev => ({ ...prev, memberNumber: '1001' }))
+      setMessage('⚠️ تعذر جلب رقم العضوية التالي، سيتم استخدام 1001')
+      setTimeout(() => setMessage(''), 3000)
+    }
+  }
+  
+  fetchNextNumber()
+}, [])
   // ✅ معالجة تغيير تشيك بوكس Other
   const handleOtherChange = (checked: boolean) => {
     console.log('🔄 تغيير Other:', checked)

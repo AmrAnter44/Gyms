@@ -4,31 +4,41 @@ import { prisma } from '../../../../lib/prisma'
 // جلب رقم العضوية التالي
 export async function GET() {
   try {
+    console.log('🔍 بدء البحث عن آخر رقم عضوية...')
+    
     // ✅ جلب آخر رقم عضوية (نستثني الأعضاء اللي memberNumber = null)
     const lastMember = await prisma.member.findFirst({
       where: {
         memberNumber: {
-          not: null // ✅ نستثني الـ Other
+          not: null
         }
       },
       orderBy: { memberNumber: 'desc' },
-      select: { memberNumber: true }
+      select: { memberNumber: true, name: true }
     })
 
-    // الرقم التالي
+    console.log('👤 آخر عضو:', lastMember)
+
+    // ✅ الرقم التالي
     const nextNumber = lastMember?.memberNumber ? lastMember.memberNumber + 1 : 1001
 
     console.log('📊 آخر رقم عضوية:', lastMember?.memberNumber, '➡️ الرقم التالي:', nextNumber)
 
     return NextResponse.json({ 
-      nextNumber,
-      message: 'تم جلب رقم العضوية التالي بنجاح'
-    })
+      nextNumber: nextNumber,
+      message: 'تم جلب رقم العضوية التالي بنجاح',
+      lastMember: lastMember?.name || 'لا يوجد'
+    }, { status: 200 })
+    
   } catch (error) {
     console.error('❌ Error fetching next member number:', error)
+    
+    // ✅ حتى في حالة الخطأ، نرجع رقم افتراضي
     return NextResponse.json({ 
-      error: 'فشل جلب الرقم' 
-    }, { status: 500 })
+      nextNumber: 1001,
+      message: 'تم استخدام رقم افتراضي بسبب خطأ',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 200 }) // ✅ 200 وليس 500
   }
 }
 
