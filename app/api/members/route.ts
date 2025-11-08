@@ -1,10 +1,9 @@
-// app/api/members/route.ts - إصلاح مشكلة Other
+// app/api/members/route.ts - مع تحديث Counter بعد الحفظ
 import { NextResponse } from 'next/server'
 import { prisma } from '../../../lib/prisma'
 
 // 🔧 دالة للبحث عن رقم إيصال متاح (integers فقط)
 async function getNextAvailableReceiptNumber(startingNumber: number): Promise<number> {
-  // ✅ تحويل لـ integer صريح
   let currentNumber = parseInt(startingNumber.toString())
   let attempts = 0
   const MAX_ATTEMPTS = 100
@@ -76,7 +75,7 @@ export async function POST(request: Request) {
       expiryDate, 
       paymentMethod,
       staffName,
-      isOther // ✅ استقبال isOther
+      isOther
     } = body
 
     console.log('📝 إضافة عضو جديد:', { 
@@ -87,7 +86,7 @@ export async function POST(request: Request) {
       staffName 
     })
 
-    // ✅ التحقق من اسم الموظف
+    // التحقق من اسم الموظف
     if (!staffName || !staffName.trim()) {
       return NextResponse.json(
         { error: 'اسم الموظف مطلوب' },
@@ -95,16 +94,13 @@ export async function POST(request: Request) {
       )
     }
 
-    // ✅ تحويل كل الأرقام لـ integers
-    // إذا كان isOther = true، نخلي memberNumber = null
+    // تحويل كل الأرقام لـ integers
     let cleanMemberNumber = null
     
     if (isOther === true) {
-      // Other: بدون رقم عضوية
       cleanMemberNumber = null
       console.log('✅ عضو Other (بدون رقم عضوية)')
     } else {
-      // عضو عادي: لازم رقم عضوية
       if (!memberNumber) {
         return NextResponse.json(
           { error: 'رقم العضوية مطلوب' },
@@ -152,7 +148,7 @@ export async function POST(request: Request) {
     // إنشاء العضو
     const member = await prisma.member.create({
       data: {
-        memberNumber: cleanMemberNumber, // null للـ Other
+        memberNumber: cleanMemberNumber,
         name,
         phone,
         profileImage,
@@ -167,7 +163,37 @@ export async function POST(request: Request) {
       },
     })
 
-    console.log('✅ تم إنشاء العضو:', member.id, 'رقم العضوية:', member.memberNumber, 'صورة:', member.profileImage)
+    console.log('✅ تم إنشاء العضو:', member.id, 'رقم العضوية:', member.memberNumber)
+
+    // ✅✅✅ هنا الإضافة المهمة: تحديث MemberCounter بعد الحفظ الناجح
+    if (cleanMemberNumber !== null) {
+      try {
+        // نجيب الـ counter الحالي
+        let counter = await prisma.memberCounter.findUnique({ where: { id: 1 } })
+        
+        if (!counter) {
+          // لو مفيش، نعمل واحد
+          await prisma.memberCounter.create({
+            data: { id: 1, current: cleanMemberNumber + 1 }
+          })
+          console.log('📊 تم إنشاء MemberCounter بقيمة:', cleanMemberNumber + 1)
+        } else {
+          // لو الرقم المحفوظ أكبر من أو يساوي الـ counter الحالي
+          if (cleanMemberNumber >= counter.current) {
+            await prisma.memberCounter.update({
+              where: { id: 1 },
+              data: { current: cleanMemberNumber + 1 }
+            })
+            console.log('🔄 تم تحديث MemberCounter إلى:', cleanMemberNumber + 1)
+          } else {
+            console.log('ℹ️ المحتوى الحالي للـ Counter أعلى، لا داعي للتحديث')
+          }
+        }
+      } catch (counterError) {
+        console.error('⚠️ خطأ في تحديث MemberCounter (غير حرج):', counterError)
+        // نستمر حتى لو فشل تحديث الـ counter
+      }
+    }
 
     // إنشاء إيصال دائماً
     let receiptData = null
@@ -183,12 +209,10 @@ export async function POST(request: Request) {
 
       console.log('🧾 رقم الإيصال من العداد:', counter.current)
 
-      // ✅ البحث عن رقم إيصال متاح (integers فقط)
       const availableReceiptNumber = await getNextAvailableReceiptNumber(counter.current)
       
       console.log('✅ سيتم استخدام رقم الإيصال:', availableReceiptNumber)
 
-      // ✅ المبلغ المدفوع كـ integer
       const paidAmount = cleanSubscriptionPrice - cleanRemainingAmount
 
       let subscriptionDays = null
@@ -206,7 +230,7 @@ export async function POST(request: Request) {
           paymentMethod: paymentMethod || 'cash',
           staffName: staffName.trim(),
           itemDetails: JSON.stringify({
-            memberNumber: cleanMemberNumber, // null للـ Other
+            memberNumber: cleanMemberNumber,
             memberName: name,
             subscriptionPrice: cleanSubscriptionPrice,
             paidAmount: paidAmount,
@@ -218,7 +242,7 @@ export async function POST(request: Request) {
             expiryDate: expiryDate,
             subscriptionDays: subscriptionDays,
             staffName: staffName.trim(),
-            isOther: isOther === true, // ✅ حفظ في التفاصيل
+            isOther: isOther === true,
           }),
           memberId: member.id,
         },
@@ -226,7 +250,6 @@ export async function POST(request: Request) {
 
       console.log('✅ تم إنشاء الإيصال:', receipt.receiptNumber)
 
-      // ✅ تحديث العداد (integer)
       const newCounterValue = availableReceiptNumber + 1
       await prisma.receiptCounter.update({
         where: { id: 1 },
@@ -271,7 +294,7 @@ export async function PUT(request: Request) {
 
     const updateData: any = {}
     
-    // ✅ تحويل كل الأرقام لـ integers
+    // تحويل كل الأرقام لـ integers
     if (data.memberNumber !== undefined) {
       updateData.memberNumber = data.memberNumber ? parseInt(data.memberNumber.toString()) : null
     }

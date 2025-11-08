@@ -9,7 +9,7 @@ datasource db {
 
 model Member {
   id                String       @id @default(cuid())
-  memberNumber      Int          @unique
+  memberNumber      Int?         @unique  // ✅ optional للدعم Other
   name              String
   phone             String
   profileImage      String?
@@ -131,6 +131,7 @@ model MemberCounter {
 
 model Staff {
   id         String       @id @default(cuid())
+  
   staffCode  Int          @unique  // ✅ رقم الموظف الفريد
   name       String
   phone      String?

@@ -1,48 +1,96 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '../../../../lib/prisma'
 
-// جلب رقم العضوية التالي
+// ✅ GET: بس يقرأ الرقم المتاح (بدون تحديث!)
 export async function GET() {
   try {
-    console.log('🔍 بدء البحث عن آخر رقم عضوية...')
+    console.log('🔍 قراءة رقم العضوية التالي...')
     
-    // ✅ جلب آخر رقم عضوية (نستثني الأعضاء اللي memberNumber = null)
-    const lastMember = await prisma.member.findFirst({
-      where: {
-        memberNumber: {
-          not: null
-        }
-      },
-      orderBy: { memberNumber: 'desc' },
-      select: { memberNumber: true, name: true }
+    // ✅ نقرأ من MemberCounter
+    let counter = await prisma.memberCounter.findUnique({ 
+      where: { id: 1 } 
     })
+    
+    // لو مفيش counter، نعمل واحد
+    if (!counter) {
+      console.log('📊 إنشاء MemberCounter لأول مرة')
+      counter = await prisma.memberCounter.create({
+        data: { id: 1, current: 1001 }
+      })
+    }
 
-    console.log('👤 آخر عضو:', lastMember)
+    console.log('📊 الرقم الحالي من Counter:', counter.current)
 
-    // ✅ الرقم التالي
-    const nextNumber = lastMember?.memberNumber ? lastMember.memberNumber + 1 : 1001
+    // ✅ نتحقق إن الرقم متاح (بدون تحديث)
+    let nextNumber = counter.current
+    let attempts = 0
+    const MAX_ATTEMPTS = 100
 
-    console.log('📊 آخر رقم عضوية:', lastMember?.memberNumber, '➡️ الرقم التالي:', nextNumber)
+    while (attempts < MAX_ATTEMPTS) {
+      const existingMember = await prisma.member.findUnique({
+        where: { memberNumber: nextNumber }
+      })
+
+      if (!existingMember) {
+        // ✅ الرقم متاح
+        console.log(`✅ رقم متاح: ${nextNumber}`)
+        break
+      }
+
+      // الرقم مستخدم، نجرب التالي
+      console.log(`⚠️ رقم ${nextNumber} موجود، تجربة ${nextNumber + 1}...`)
+      nextNumber++
+      attempts++
+    }
+
+    if (attempts >= MAX_ATTEMPTS) {
+      throw new Error('فشل إيجاد رقم عضوية متاح')
+    }
+
+    // ⚠️ هنا الفرق: مش بنحدث الـ Counter!
+    // الـ Counter هيتحدث لما العضو يتحفظ فعلاً
 
     return NextResponse.json({ 
       nextNumber: nextNumber,
       message: 'تم جلب رقم العضوية التالي بنجاح',
-      lastMember: lastMember?.name || 'لا يوجد'
+      fromCounter: true
     }, { status: 200 })
     
   } catch (error) {
     console.error('❌ Error fetching next member number:', error)
     
-    // ✅ حتى في حالة الخطأ، نرجع رقم افتراضي
+    // Fallback: نجيب آخر رقم من الأعضاء
+    try {
+      const members = await prisma.member.findMany({
+        where: { memberNumber: { not: null } },
+        orderBy: { memberNumber: 'desc' },
+        select: { memberNumber: true },
+        take: 1
+      })
+
+      if (members[0] && members[0].memberNumber) {
+        const nextNum = parseInt(members[0].memberNumber.toString()) + 1
+        return NextResponse.json({ 
+          nextNumber: nextNum,
+          message: 'تم جلب الرقم من آخر عضو',
+          fromCounter: false
+        }, { status: 200 })
+      }
+    } catch (fallbackError) {
+      console.error('❌ Fallback failed:', fallbackError)
+    }
+
+    // آخر حل: رقم افتراضي
     return NextResponse.json({ 
       nextNumber: 1001,
-      message: 'تم استخدام رقم افتراضي بسبب خطأ',
+      message: 'تم استخدام رقم افتراضي',
+      fromCounter: false,
       error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 200 }) // ✅ 200 وليس 500
+    }, { status: 200 })
   }
 }
 
-// تحديث رقم البداية (للإعدادات)
+// ✅ تحديث رقم البداية من الإعدادات
 export async function POST(request: Request) {
   try {
     const { startNumber } = await request.json()
@@ -55,18 +103,25 @@ export async function POST(request: Request) {
 
     const parsedNumber = parseInt(startNumber)
 
-    // ✅ التحقق من عدم وجود رقم عضوية بهذا الرقم (نستثني null)
+    // التحقق من عدم وجود رقم عضوية بهذا الرقم
     const existingMember = await prisma.member.findUnique({
       where: { memberNumber: parsedNumber }
     })
 
     if (existingMember) {
       return NextResponse.json({ 
-        error: `رقم العضوية ${parsedNumber} مستخدم بالفعل` 
+        error: `رقم العضوية ${parsedNumber} مستخدم بالفعل. اختر رقماً أكبر.` 
       }, { status: 400 })
     }
 
-    console.log('✅ تم تحديث رقم البداية إلى:', parsedNumber)
+    // تحديث أو إنشاء MemberCounter
+    await prisma.memberCounter.upsert({
+      where: { id: 1 },
+      update: { current: parsedNumber },
+      create: { id: 1, current: parsedNumber }
+    })
+
+    console.log('✅ تم تحديث MemberCounter إلى:', parsedNumber)
 
     return NextResponse.json({ 
       success: true,
@@ -76,7 +131,8 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('❌ Error updating member counter:', error)
     return NextResponse.json({ 
-      error: 'فشل تحديث رقم العضوية' 
+      error: 'فشل تحديث رقم العضوية',
+      details: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
 }
