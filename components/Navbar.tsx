@@ -273,9 +273,11 @@ export default function Navbar() {
 
   return (
     <>
+      {/* ✅ Navbar بتصميم صفين */}
       <nav className="bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg sticky top-0 z-40">
         <div className="container mx-auto px-2 sm:px-4">
-          <div className="flex items-center justify-between h-16 gap-2">
+          {/* الصف الأول: اللوجو + البحث السريع */}
+          <div className="flex items-center justify-between h-14 sm:h-16 gap-2 border-b border-white/20 lg:border-0">
             {/* Logo */}
             <div className="flex items-center gap-2 flex-shrink-0">
               <img src='/icon.png' alt="logo" className='w-6 h-6 sm:w-8 sm:h-8'/>
@@ -289,28 +291,28 @@ export default function Navbar() {
                 setSearchMessage(null)
                 setTimeout(() => searchInputRef.current?.focus(), 100)
               }}
-              className="px-2 sm:px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition flex items-center gap-1 sm:gap-2 font-bold flex-shrink-0"
+              className="px-3 sm:px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition flex items-center gap-1 sm:gap-2 font-bold flex-shrink-0"
             >
               <span>🔍</span>
-              <span className="hidden sm:inline text-sm sm:text-base">بحث سريع</span>
+              <span className="text-sm sm:text-base">بحث</span>
               <kbd className="hidden lg:inline-block px-2 py-1 bg-white/20 rounded text-xs">Ctrl+K</kbd>
             </button>
-            
-            {/* Navigation Links */}
-            <div className="flex gap-1 overflow-x-auto scrollbar-hide flex-1">
-              {links.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className={`px-2 sm:px-3 py-2 rounded-lg transition-all hover:bg-white/20 whitespace-nowrap text-sm sm:text-base ${
-                    pathname === link.href ? 'bg-white/30 font-bold' : ''
-                  }`}
-                >
-                  <span className="mr-1">{link.icon}</span>
-                  <span className="hidden xl:inline">{link.label}</span>
-                </Link>
-              ))}
-            </div>
+          </div>
+
+          {/* الصف الثاني: روابط التنقل - بدون سكرول في الموبايل */}
+          <div className="grid grid-cols-4 sm:grid-cols-6 lg:flex lg:justify-center gap-1 py-2 lg:py-3">
+            {links.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`px-2 py-2 rounded-lg transition-all hover:bg-white/20 text-center flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1 ${
+                  pathname === link.href ? 'bg-white/30 font-bold' : ''
+                }`}
+              >
+                <span className="text-base sm:text-lg">{link.icon}</span>
+                <span className="text-[10px] sm:text-xs lg:text-sm whitespace-nowrap">{link.label}</span>
+              </Link>
+            ))}
           </div>
         </div>
       </nav>
@@ -471,15 +473,6 @@ export default function Navbar() {
         
         .animate-slideDown {
           animation: slideDown 0.4s ease-out;
-        }
-        
-        /* إخفاء scrollbar لكن يبقى يشتغل */
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
         }
       `}</style>
     </>
