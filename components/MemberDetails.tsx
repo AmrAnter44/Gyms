@@ -6,6 +6,7 @@ import { ReceiptToPrint } from '../components/ReceiptToPrint'
 import PaymentMethodSelector from './Paymentmethodselector'
 import { formatDateYMD, calculateRemainingDays } from '../lib/dateFormatter'
 import ImageUpload from '../components/ImageUpload'
+import BarcodeWhatsApp from '../components/BarcodeWhatsApp' 
 // في MemberDetailPage - تحديث interface
 interface Member {
   id: string
@@ -175,7 +176,11 @@ export default function MemberDetailPage() {
       setLoading(false)
     }
   }
-
+      <BarcodeWhatsApp
+        memberNumber={member.memberNumber}
+        memberName={member.name}
+        memberPhone={member.phone}
+      />
   // تنقيص حصة دعوة
   const handleUseInvitation = async () => {
     if (!member || member.invitations <= 0) {
