@@ -1,0 +1,321 @@
+// types/permissions.ts - أنواع نظام الصلاحيات
+
+/**
+ * الأدوار المتاحة في النظام
+ */
+export type UserRole = 'ADMIN' | 'MANAGER' | 'STAFF'
+
+/**
+ * صلاحيات المستخدم
+ */
+export interface Permissions {
+  // صلاحيات الأعضاء
+  canViewMembers: boolean
+  canCreateMembers: boolean
+  canEditMembers: boolean
+  canDeleteMembers: boolean
+  
+  // صلاحيات التدريب الشخصي
+  canViewPT: boolean
+  canCreatePT: boolean
+  canEditPT: boolean
+  canDeletePT: boolean
+  
+  // صلاحيات الموظفين
+  canViewStaff: boolean
+  canCreateStaff: boolean
+  canEditStaff: boolean
+  canDeleteStaff: boolean
+  
+  // صلاحيات الإيصالات
+  canViewReceipts: boolean
+  canEditReceipts: boolean
+  canDeleteReceipts: boolean
+  
+  // صلاحيات التقارير والماليات
+  canViewReports: boolean
+  canViewFinancials: boolean
+  
+  // صلاحيات الإعدادات
+  canAccessSettings: boolean
+}
+
+/**
+ * بيانات المستخدم الأساسية
+ */
+export interface User {
+  id: string
+  name: string
+  email: string
+  role: UserRole
+  isActive: boolean
+  createdAt: string
+  permissions?: Permissions
+}
+
+/**
+ * payload الـ JWT
+ */
+export interface JWTPayload {
+  userId: string
+  email: string
+  role: UserRole
+  permissions?: Permissions
+  iat?: number
+  exp?: number
+}
+
+/**
+ * حالة المصادقة
+ */
+export interface AuthState {
+  user: User | null
+  permissions: Permissions | null
+  loading: boolean
+  isAuthenticated: boolean
+  isAdmin: boolean
+}
+
+/**
+ * استجابة API للمصادقة
+ */
+export interface AuthResponse {
+  success: boolean
+  user: User
+  message?: string
+}
+
+/**
+ * خطأ الصلاحيات
+ */
+export interface PermissionError {
+  error: string
+  requiredPermission?: keyof Permissions
+  userRole?: UserRole
+}
+
+/**
+ * إعدادات الصلاحيات الافتراضية حسب الدور
+ */
+export const DEFAULT_PERMISSIONS: Record<UserRole, Permissions> = {
+  ADMIN: {
+    canViewMembers: true,
+    canCreateMembers: true,
+    canEditMembers: true,
+    canDeleteMembers: true,
+    canViewPT: true,
+    canCreatePT: true,
+    canEditPT: true,
+    canDeletePT: true,
+    canViewStaff: true,
+    canCreateStaff: true,
+    canEditStaff: true,
+    canDeleteStaff: true,
+    canViewReceipts: true,
+    canEditReceipts: true,
+    canDeleteReceipts: true,
+    canViewReports: true,
+    canViewFinancials: true,
+    canAccessSettings: true,
+  },
+  MANAGER: {
+    canViewMembers: true,
+    canCreateMembers: true,
+    canEditMembers: true,
+    canDeleteMembers: false,
+    canViewPT: true,
+    canCreatePT: true,
+    canEditPT: true,
+    canDeletePT: false,
+    canViewStaff: true,
+    canCreateStaff: false,
+    canEditStaff: false,
+    canDeleteStaff: false,
+    canViewReceipts: true,
+    canEditReceipts: true,
+    canDeleteReceipts: false,
+    canViewReports: true,
+    canViewFinancials: true,
+    canAccessSettings: false,
+  },
+  STAFF: {
+    canViewMembers: true,
+    canCreateMembers: false,
+    canEditMembers: false,
+    canDeleteMembers: false,
+    canViewPT: true,
+    canCreatePT: false,
+    canEditPT: false,
+    canDeletePT: false,
+    canViewStaff: false,
+    canCreateStaff: false,
+    canEditStaff: false,
+    canDeleteStaff: false,
+    canViewReceipts: true,
+    canEditReceipts: false,
+    canDeleteReceipts: false,
+    canViewReports: false,
+    canViewFinancials: false,
+    canAccessSettings: false,
+  },
+}
+
+/**
+ * أسماء الصلاحيات بالعربية
+ */
+export const PERMISSION_LABELS: Record<keyof Permissions, string> = {
+  canViewMembers: 'عرض الأعضاء',
+  canCreateMembers: 'إضافة عضو',
+  canEditMembers: 'تعديل عضو',
+  canDeleteMembers: 'حذف عضو',
+  canViewPT: 'عرض التدريب الشخصي',
+  canCreatePT: 'إنشاء جلسة PT',
+  canEditPT: 'تعديل جلسة PT',
+  canDeletePT: 'حذف جلسة PT',
+  canViewStaff: 'عرض الموظفين',
+  canCreateStaff: 'إضافة موظف',
+  canEditStaff: 'تعديل موظف',
+  canDeleteStaff: 'حذف موظف',
+  canViewReceipts: 'عرض الإيصالات',
+  canEditReceipts: 'تعديل إيصال',
+  canDeleteReceipts: 'حذف إيصال',
+  canViewReports: 'عرض التقارير',
+  canViewFinancials: 'عرض الماليات',
+  canAccessSettings: 'الوصول للإعدادات',
+}
+
+/**
+ * تجميع الصلاحيات حسب الفئة
+ */
+export const PERMISSION_GROUPS = {
+  members: {
+    label: '👥 الأعضاء',
+    permissions: [
+      'canViewMembers',
+      'canCreateMembers',
+      'canEditMembers',
+      'canDeleteMembers',
+    ] as Array<keyof Permissions>,
+  },
+  pt: {
+    label: '💪 التدريب الشخصي',
+    permissions: [
+      'canViewPT',
+      'canCreatePT',
+      'canEditPT',
+      'canDeletePT',
+    ] as Array<keyof Permissions>,
+  },
+  staff: {
+    label: '👷 الموظفين',
+    permissions: [
+      'canViewStaff',
+      'canCreateStaff',
+      'canEditStaff',
+      'canDeleteStaff',
+    ] as Array<keyof Permissions>,
+  },
+  receipts: {
+    label: '🧾 الإيصالات',
+    permissions: [
+      'canViewReceipts',
+      'canEditReceipts',
+      'canDeleteReceipts',
+    ] as Array<keyof Permissions>,
+  },
+  reports: {
+    label: '📊 التقارير والماليات',
+    permissions: [
+      'canViewReports',
+      'canViewFinancials',
+    ] as Array<keyof Permissions>,
+  },
+  settings: {
+    label: '⚙️ الإعدادات',
+    permissions: [
+      'canAccessSettings',
+    ] as Array<keyof Permissions>,
+  },
+}
+
+/**
+ * أيقونات الصلاحيات
+ */
+export const PERMISSION_ICONS: Record<keyof Permissions, string> = {
+  canViewMembers: '👁️',
+  canCreateMembers: '➕',
+  canEditMembers: '✏️',
+  canDeleteMembers: '🗑️',
+  canViewPT: '👁️',
+  canCreatePT: '➕',
+  canEditPT: '✏️',
+  canDeletePT: '🗑️',
+  canViewStaff: '👁️',
+  canCreateStaff: '➕',
+  canEditStaff: '✏️',
+  canDeleteStaff: '🗑️',
+  canViewReceipts: '👁️',
+  canEditReceipts: '✏️',
+  canDeleteReceipts: '🗑️',
+  canViewReports: '📊',
+  canViewFinancials: '💰',
+  canAccessSettings: '⚙️',
+}
+
+/**
+ * دالة للحصول على الصلاحيات الافتراضية حسب الدور
+ */
+export function getDefaultPermissions(role: UserRole): Permissions {
+  return DEFAULT_PERMISSIONS[role]
+}
+
+/**
+ * دالة للتحقق من صلاحية واحدة
+ */
+export function hasPermission(
+  permissions: Permissions | null | undefined,
+  permission: keyof Permissions,
+  role?: UserRole
+): boolean {
+  // Admin له كل الصلاحيات
+  if (role === 'ADMIN') return true
+  
+  // إذا لم تكن هناك صلاحيات
+  if (!permissions) return false
+  
+  return permissions[permission]
+}
+
+/**
+ * دالة للتحقق من صلاحيات متعددة (واحدة على الأقل)
+ */
+export function hasAnyPermission(
+  permissions: Permissions | null | undefined,
+  permissionList: Array<keyof Permissions>,
+  role?: UserRole
+): boolean {
+  // Admin له كل الصلاحيات
+  if (role === 'ADMIN') return true
+  
+  // إذا لم تكن هناك صلاحيات
+  if (!permissions) return false
+  
+  return permissionList.some(perm => permissions[perm])
+}
+
+/**
+ * دالة للتحقق من صلاحيات متعددة (الكل مطلوب)
+ */
+export function hasAllPermissions(
+  permissions: Permissions | null | undefined,
+  permissionList: Array<keyof Permissions>,
+  role?: UserRole
+): boolean {
+  // Admin له كل الصلاحيات
+  if (role === 'ADMIN') return true
+  
+  // إذا لم تكن هناك صلاحيات
+  if (!permissions) return false
+  
+  return permissionList.every(perm => permissions[perm])
+}

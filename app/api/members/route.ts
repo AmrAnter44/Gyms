@@ -1,6 +1,7 @@
-// app/api/members/route.ts - مع تحديث Counter بعد الحفظ
+// app/api/members/route.ts - مع فحص الصلاحيات
 import { NextResponse } from 'next/server'
 import { prisma } from '../../../lib/prisma'
+import { requirePermission } from '../../../lib/auth'
 
 // 🔧 دالة للبحث عن رقم إيصال متاح (integers فقط)
 async function getNextAvailableReceiptNumber(startingNumber: number): Promise<number> {
@@ -27,8 +28,11 @@ async function getNextAvailableReceiptNumber(startingNumber: number): Promise<nu
 }
 
 // GET - جلب كل الأعضاء
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    // ✅ التحقق من صلاحية عرض الأعضاء
+    await requirePermission(request, 'canViewMembers')
+    
     console.log('🔍 بدء جلب الأعضاء...')
     
     const members = await prisma.member.findMany({
@@ -44,8 +48,23 @@ export async function GET() {
     }
     
     return NextResponse.json(members, { status: 200 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error fetching members:', error)
+    
+    // التعامل مع أخطاء الصلاحيات
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية عرض الأعضاء' },
+        { status: 403 }
+      )
+    }
     
     return NextResponse.json([], { 
       status: 200,
@@ -59,6 +78,9 @@ export async function GET() {
 // POST - إضافة عضو جديد
 export async function POST(request: Request) {
   try {
+    // ✅ التحقق من صلاحية إضافة عضو
+    await requirePermission(request, 'canCreateMembers')
+    
     const body = await request.json()
     const { 
       memberNumber, 
@@ -165,20 +187,17 @@ export async function POST(request: Request) {
 
     console.log('✅ تم إنشاء العضو:', member.id, 'رقم العضوية:', member.memberNumber)
 
-    // ✅✅✅ هنا الإضافة المهمة: تحديث MemberCounter بعد الحفظ الناجح
+    // تحديث MemberCounter بعد الحفظ الناجح
     if (cleanMemberNumber !== null) {
       try {
-        // نجيب الـ counter الحالي
         let counter = await prisma.memberCounter.findUnique({ where: { id: 1 } })
         
         if (!counter) {
-          // لو مفيش، نعمل واحد
           await prisma.memberCounter.create({
             data: { id: 1, current: cleanMemberNumber + 1 }
           })
           console.log('📊 تم إنشاء MemberCounter بقيمة:', cleanMemberNumber + 1)
         } else {
-          // لو الرقم المحفوظ أكبر من أو يساوي الـ counter الحالي
           if (cleanMemberNumber >= counter.current) {
             await prisma.memberCounter.update({
               where: { id: 1 },
@@ -191,7 +210,6 @@ export async function POST(request: Request) {
         }
       } catch (counterError) {
         console.error('⚠️ خطأ في تحديث MemberCounter (غير حرج):', counterError)
-        // نستمر حتى لو فشل تحديث الـ counter
       }
     }
 
@@ -280,8 +298,24 @@ export async function POST(request: Request) {
       receipt: receiptData
     }, { status: 201 })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ خطأ في إضافة العضو:', error)
+    
+    // التعامل مع أخطاء الصلاحيات
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية إضافة أعضاء' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json({ error: 'فشل إضافة العضو' }, { status: 500 })
   }
 }
@@ -289,6 +323,9 @@ export async function POST(request: Request) {
 // PUT - تحديث عضو
 export async function PUT(request: Request) {
   try {
+    // ✅ التحقق من صلاحية تعديل عضو
+    await requirePermission(request, 'canEditMembers')
+    
     const body = await request.json()
     const { id, profileImage, ...data } = body
 
@@ -335,8 +372,24 @@ export async function PUT(request: Request) {
     })
 
     return NextResponse.json(member)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating member:', error)
+    
+    // التعامل مع أخطاء الصلاحيات
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية تعديل الأعضاء' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json({ error: 'فشل تحديث العضو' }, { status: 500 })
   }
 }
@@ -344,6 +397,9 @@ export async function PUT(request: Request) {
 // DELETE - حذف عضو
 export async function DELETE(request: Request) {
   try {
+    // ✅ التحقق من صلاحية حذف عضو
+    await requirePermission(request, 'canDeleteMembers')
+    
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
@@ -353,8 +409,24 @@ export async function DELETE(request: Request) {
 
     await prisma.member.delete({ where: { id } })
     return NextResponse.json({ message: 'تم الحذف بنجاح' })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting member:', error)
+    
+    // التعامل مع أخطاء الصلاحيات
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية حذف الأعضاء' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json({ error: 'فشل حذف العضو' }, { status: 500 })
   }
 }
