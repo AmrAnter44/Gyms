@@ -203,9 +203,9 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
             <p className="text-blue-800">
               <strong>الدعوات الحالية:</strong> {member.invitations || 0}
             </p>
-            {member.expiryDate && (
+{member.expiryDate && (
               <p className="text-blue-800">
-                <strong>تاريخ الانتهاء السابق:</strong> {new Date(member.expiryDate).toLocaleDateString('ar-EG')}
+                <strong>تاريخ الانتهاء السابق:</strong> {new Date(member.expiryDate).toISOString().split('T')[0]}
               </p>
             )}
           </div>

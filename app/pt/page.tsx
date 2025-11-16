@@ -96,6 +96,21 @@ export default function PTPage() {
     setShowForm(false)
   }
 
+  // بعد fetchCoaches اللي بتنتهي بـ setCoachesLoading(false)
+// أضف الدالة دي:
+
+const calculateExpiryFromMonths = (months: number) => {
+  if (!formData.startDate) return
+  
+  const start = new Date(formData.startDate)
+  const expiry = new Date(start)
+  expiry.setMonth(expiry.getMonth() + months)
+  
+  setFormData(prev => ({ 
+    ...prev, 
+    expiryDate: expiry.toISOString().split('T')[0] 
+  }))
+}
   const handleEdit = (session: PTSession) => {
     setFormData({
       ptNumber: session.ptNumber.toString(),
@@ -375,6 +390,22 @@ export default function PTPage() {
                   className="w-full px-3 py-2 border rounded-lg"
                 />
               </div>
+              {/* أزرار الإضافة السريعة */}
+              <div className="col-span-2">
+                <p className="text-sm font-medium mb-2">⚡ إضافة سريعة:</p>
+                <div className="flex flex-wrap gap-2">
+                  {[1, 2, 3, 6, 9, 12].map(months => (
+                    <button
+                      key={months}
+                      type="button"
+                      onClick={() => calculateExpiryFromMonths(months)}
+                      className="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-lg text-sm transition font-medium"
+                    >
+                      + {months} {months === 1 ? 'شهر' : 'أشهر'}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
               {/* طريقة الدفع */}
               <div>
@@ -538,23 +569,25 @@ export default function PTPage() {
                       <td className="px-4 py-3 font-bold text-green-600">
                         {(session.sessionsPurchased * session.pricePerSession).toFixed(0)} ج.م
                       </td>
-                      <td className="px-4 py-3">
+<td className="px-4 py-3">
                         <div className="text-xs">
                           {session.startDate && (
                             <p>
-                              من: {new Date(session.startDate).toLocaleDateString('ar-EG')}
+                              من: {new Date(session.startDate).toISOString().split('T')[0]}
                             </p>
                           )}
                           {session.expiryDate && (
                             <p className={isExpired ? 'text-red-600 font-bold' : ''}>
-                              إلى: {new Date(session.expiryDate).toLocaleDateString('ar-EG')}
+                              إلى: {new Date(session.expiryDate).toISOString().split('T')[0]}
                             </p>
                           )}
                           {isExpired && <p className="text-red-600 font-bold">❌ منتهية</p>}
                           {!isExpired && isExpiringSoon && (
                             <p className="text-orange-600 font-bold">⚠️ قريبة الانتهاء</p>
                           )}
+                          
                         </div>
+                        
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
