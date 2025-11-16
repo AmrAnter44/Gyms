@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '../../../../lib/prisma'
+import { requirePermission } from '../../../../lib/auth'
 
 export async function POST(request: Request) {
   try {
+    // ✅ التحقق من صلاحية تعديل الأعضاء (لأن دفع المتبقي يعدل بيانات العضو)
+    await requirePermission(request, 'canEditMembers')
+    
     const { memberId, amount, paymentMethod, notes } = await request.json()
 
     if (!memberId || !amount || amount <= 0) {
@@ -48,8 +52,23 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json(receipt)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating payment receipt:', error)
+    
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية إنشاء إيصالات الدفع' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json(
       { error: 'فشل إنشاء الإيصال' },
       { status: 500 }

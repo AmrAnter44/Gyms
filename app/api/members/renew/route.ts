@@ -1,6 +1,7 @@
-// app/api/members/renew/route.ts - مع إضافة staffName
+// app/api/members/renew/route.ts - مع إضافة staffName والصلاحيات
 import { NextResponse } from 'next/server'
 import { prisma } from '../../../../lib/prisma'
+import { requirePermission } from '../../../../lib/auth'
 
 // 🔧 دالة للبحث عن رقم إيصال متاح
 async function getNextAvailableReceiptNumber(startingNumber: number): Promise<number> {
@@ -29,6 +30,9 @@ async function getNextAvailableReceiptNumber(startingNumber: number): Promise<nu
 // POST - تجديد اشتراك عضو
 export async function POST(request: Request) {
   try {
+    // ✅ التحقق من صلاحية تعديل الأعضاء
+    await requirePermission(request, 'canEditMembers')
+    
     const body = await request.json()
     const { 
       memberId, 
@@ -41,7 +45,7 @@ export async function POST(request: Request) {
       expiryDate, 
       notes, 
       paymentMethod,
-      staffName // ✅ إضافة اسم الموظف
+      staffName
     } = body
 
     console.log('🔄 تجديد اشتراك عضو:', { 
@@ -53,7 +57,7 @@ export async function POST(request: Request) {
       startDate, 
       expiryDate, 
       paymentMethod,
-      staffName // ✅
+      staffName
     })
 
     // ✅ التحقق من اسم الموظف
@@ -140,7 +144,7 @@ export async function POST(request: Request) {
           type: 'تجديد عضويه',
           amount: paidAmount,
           paymentMethod: paymentMethod || 'cash',
-          staffName: staffName.trim(), // ✅ حفظ اسم الموظف
+          staffName: staffName.trim(),
           itemDetails: JSON.stringify({
             memberNumber: member.memberNumber,
             memberName: member.name,
@@ -165,7 +169,7 @@ export async function POST(request: Request) {
             newExpiryDate: expiryDate,
             subscriptionDays: subscriptionDays,
             isRenewal: true,
-            staffName: staffName.trim(), // ✅ حفظ في التفاصيل أيضاً
+            staffName: staffName.trim(),
           }),
           memberId: member.id,
         },
@@ -188,7 +192,7 @@ export async function POST(request: Request) {
           receiptNumber: receipt.receiptNumber,
           amount: receipt.amount,
           paymentMethod: receipt.paymentMethod,
-          staffName: receipt.staffName, // ✅
+          staffName: receipt.staffName,
           itemDetails: JSON.parse(receipt.itemDetails),
           createdAt: receipt.createdAt
         }
@@ -203,8 +207,23 @@ export async function POST(request: Request) {
       }, { status: 200 })
     }
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ خطأ في تجديد الاشتراك:', error)
+    
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية تجديد الاشتراكات' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json({ 
       error: 'فشل تجديد الاشتراك' 
     }, { status: 500 })

@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '../../../lib/prisma'
+import { requirePermission } from '../../../lib/auth'
 
 // GET - جلب كل المصروفات
 export async function GET(request: Request) {
   try {
+    // ✅ التحقق من صلاحية عرض المالية
+    await requirePermission(request, 'canViewFinancials')
+    
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type')
     const staffId = searchParams.get('staffId')
@@ -21,8 +25,23 @@ export async function GET(request: Request) {
     })
 
     return NextResponse.json(expenses)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching expenses:', error)
+    
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية عرض المصروفات' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json({ error: 'فشل جلب المصروفات' }, { status: 500 })
   }
 }
@@ -30,6 +49,9 @@ export async function GET(request: Request) {
 // POST - إضافة مصروف جديد
 export async function POST(request: Request) {
   try {
+    // ✅ التحقق من صلاحية الوصول للإعدادات (المصروفات جزء من الإدارة)
+    await requirePermission(request, 'canAccessSettings')
+    
     const body = await request.json()
     const { type, amount, description, notes, staffId } = body
 
@@ -54,15 +76,33 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json(expense, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating expense:', error)
+    
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية إضافة مصروفات' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json({ error: 'فشل إضافة المصروف' }, { status: 500 })
   }
 }
 
-// PUT - تحديث مصروف (مثلاً تحديد سلفة كمدفوعة)
+// PUT - تحديث مصروف
 export async function PUT(request: Request) {
   try {
+    // ✅ التحقق من صلاحية الوصول للإعدادات
+    await requirePermission(request, 'canAccessSettings')
+    
     const body = await request.json()
     const { id, ...data } = body
 
@@ -75,8 +115,23 @@ export async function PUT(request: Request) {
     })
 
     return NextResponse.json(expense)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating expense:', error)
+    
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية تعديل المصروفات' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json({ error: 'فشل تحديث المصروف' }, { status: 500 })
   }
 }
@@ -84,6 +139,9 @@ export async function PUT(request: Request) {
 // DELETE - حذف مصروف
 export async function DELETE(request: Request) {
   try {
+    // ✅ التحقق من صلاحية الوصول للإعدادات
+    await requirePermission(request, 'canAccessSettings')
+    
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
@@ -93,8 +151,23 @@ export async function DELETE(request: Request) {
 
     await prisma.expense.delete({ where: { id } })
     return NextResponse.json({ message: 'تم الحذف بنجاح' })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting expense:', error)
+    
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية حذف المصروفات' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json({ error: 'فشل حذف المصروف' }, { status: 500 })
   }
 }

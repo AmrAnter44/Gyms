@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '../../../../lib/prisma'
+import { requirePermission } from '../../../../lib/auth'
 
 // ✅ GET: بس يقرأ الرقم المتاح (بدون تحديث!)
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    // ✅ التحقق من صلاحية عرض الأعضاء (لأن هذا جزء من إضافة عضو)
+    await requirePermission(request, 'canViewMembers')
+    
     console.log('🔍 قراءة رقم العضوية التالي...')
     
     // ✅ نقرأ من MemberCounter
@@ -56,8 +60,23 @@ export async function GET() {
       fromCounter: true
     }, { status: 200 })
     
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error fetching next member number:', error)
+    
+    // التعامل مع أخطاء الصلاحيات
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية الوصول لأرقام العضوية' },
+        { status: 403 }
+      )
+    }
     
     // Fallback: نجيب آخر رقم من الأعضاء
     try {
@@ -93,6 +112,9 @@ export async function GET() {
 // ✅ تحديث رقم البداية من الإعدادات
 export async function POST(request: Request) {
   try {
+    // ✅ التحقق من صلاحية الوصول للإعدادات
+    await requirePermission(request, 'canAccessSettings')
+    
     const { startNumber } = await request.json()
     
     if (!startNumber || startNumber < 1) {
@@ -128,8 +150,23 @@ export async function POST(request: Request) {
       newNumber: parsedNumber,
       message: `تم تحديث رقم العضوية ليبدأ من ${parsedNumber}`
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('❌ Error updating member counter:', error)
+    
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية تعديل إعدادات العضوية' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json({ 
       error: 'فشل تحديث رقم العضوية',
       details: error instanceof Error ? error.message : 'Unknown error'

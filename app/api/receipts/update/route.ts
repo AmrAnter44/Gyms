@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '../../../../lib/prisma'
+import { requirePermission } from '../../../../lib/auth'
 
 // تحديث إيصال موجود
 export async function PUT(request: Request) {
   try {
+    // ✅ التحقق من صلاحية تعديل الإيصالات
+    await requirePermission(request, 'canEditReceipts')
+    
     const { 
       receiptId, 
       receiptNumber, 
@@ -56,8 +60,23 @@ export async function PUT(request: Request) {
       receipt: updatedReceipt,
       message: 'تم تحديث الإيصال بنجاح'
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating receipt:', error)
+    
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية تعديل الإيصالات' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json(
       { error: 'فشل تحديث الإيصال' },
       { status: 500 }
@@ -68,6 +87,9 @@ export async function PUT(request: Request) {
 // حذف إيصال
 export async function DELETE(request: Request) {
   try {
+    // ✅ التحقق من صلاحية حذف الإيصالات
+    await requirePermission(request, 'canDeleteReceipts')
+    
     const { searchParams } = new URL(request.url)
     const receiptId = searchParams.get('id')
 
@@ -93,8 +115,23 @@ export async function DELETE(request: Request) {
       success: true,
       message: 'تم حذف الإيصال بنجاح'
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting receipt:', error)
+    
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية حذف الإيصالات' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json(
       { error: 'فشل حذف الإيصال' },
       { status: 500 }

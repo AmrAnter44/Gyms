@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '../../../lib/prisma'
+import { requirePermission } from '../../../lib/auth'
 
 // GET - جلب كل الموظفين
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    // ✅ التحقق من صلاحية عرض الموظفين
+    await requirePermission(request, 'canViewStaff')
+    
     const staff = await prisma.staff.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
@@ -22,8 +26,23 @@ export async function GET() {
       }
     })
     return NextResponse.json(staff)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching staff:', error)
+    
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية عرض الموظفين' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json({ error: 'فشل جلب الموظفين' }, { status: 500 })
   }
 }
@@ -31,6 +50,9 @@ export async function GET() {
 // POST - إضافة موظف جديد
 export async function POST(request: Request) {
   try {
+    // ✅ التحقق من صلاحية إضافة موظف
+    await requirePermission(request, 'canCreateStaff')
+    
     const body = await request.json()
     const { staffCode, name, phone, position, salary, notes } = body
 
@@ -62,8 +84,23 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json(staff, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating staff:', error)
+    
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية إضافة موظفين' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json({ error: 'فشل إضافة الموظف' }, { status: 500 })
   }
 }
@@ -71,6 +108,9 @@ export async function POST(request: Request) {
 // PUT - تحديث موظف
 export async function PUT(request: Request) {
   try {
+    // ✅ التحقق من صلاحية تعديل موظف
+    await requirePermission(request, 'canEditStaff')
+    
     const body = await request.json()
     const { id, staffCode, ...data } = body
 
@@ -95,8 +135,23 @@ export async function PUT(request: Request) {
     })
 
     return NextResponse.json(staff)
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating staff:', error)
+    
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية تعديل الموظفين' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json({ error: 'فشل تحديث الموظف' }, { status: 500 })
   }
 }
@@ -104,6 +159,9 @@ export async function PUT(request: Request) {
 // DELETE - حذف موظف
 export async function DELETE(request: Request) {
   try {
+    // ✅ التحقق من صلاحية حذف موظف
+    await requirePermission(request, 'canDeleteStaff')
+    
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
 
@@ -113,8 +171,23 @@ export async function DELETE(request: Request) {
 
     await prisma.staff.delete({ where: { id } })
     return NextResponse.json({ message: 'تم الحذف بنجاح' })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting staff:', error)
+    
+    if (error.message === 'Unauthorized') {
+      return NextResponse.json(
+        { error: 'يجب تسجيل الدخول أولاً' },
+        { status: 401 }
+      )
+    }
+    
+    if (error.message.includes('Forbidden')) {
+      return NextResponse.json(
+        { error: 'ليس لديك صلاحية حذف الموظفين' },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json({ error: 'فشل حذف الموظف' }, { status: 500 })
   }
 }
