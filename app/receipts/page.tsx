@@ -6,6 +6,7 @@ import { usePermissions } from '../../hooks/usePermissions'
 import PermissionDenied from '../../components/PermissionDenied'
 import ReceiptWhatsApp from '../../components/ReceiptWhatsApp'
 import { ReceiptDetailModal } from '../../components/ReceiptDetailModal'
+import { printReceiptFromData } from '../../lib/printSystem'
 
 interface Receipt {
   id: string
@@ -281,189 +282,20 @@ export default function ReceiptsPage() {
   }
 
   const handlePrint = (receipt: Receipt) => {
-    const printWindow = window.open('', '_blank')
-    if (!printWindow) return
-
     try {
       const details = JSON.parse(receipt.itemDetails)
       
-      printWindow.document.write(`
-        <!DOCTYPE html>
-        <html dir="rtl">
-        <head>
-          <meta charset="utf-8">
-          <title>إيصال رقم ${receipt.receiptNumber}</title>
-          <style>
-            body { 
-              font-family: Arial, sans-serif; 
-              padding: 20px;
-              background: #f5f5f5;
-            }
-            .receipt { 
-              max-width: 400px; 
-              margin: 0 auto; 
-              border: 2px solid #000; 
-              padding: 20px;
-              background: white;
-              box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            }
-            .header { 
-              text-align: center; 
-              margin-bottom: 20px; 
-              border-bottom: 2px solid #000; 
-              padding-bottom: 10px; 
-            }
-            .header h2 {
-              margin: 0 0 10px 0;
-              color: #333;
-            }
-            .row { 
-              display: flex; 
-              justify-content: space-between; 
-              margin: 10px 0;
-              padding: 5px 0;
-            }
-            .row.highlight {
-              background: #f0f0f0;
-              padding: 5px 10px;
-              margin: 5px -10px;
-              border-radius: 5px;
-            }
-            .label {
-              font-weight: bold;
-              color: #555;
-            }
-            .value {
-              color: #333;
-            }
-            .total { 
-              font-size: 20px; 
-              font-weight: bold; 
-              margin-top: 20px; 
-              padding-top: 10px; 
-              border-top: 2px solid #000; 
-              text-align: center;
-            }
-            .total .amount {
-              color: #2ecc71;
-              font-size: 24px;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 20px;
-              padding-top: 10px;
-              border-top: 1px dashed #999;
-              color: #666;
-              font-size: 12px;
-            }
-            @media print { 
-              body { background: white; }
-              button { display: none; }
-              .receipt { box-shadow: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="receipt">
-            <div class="header">
-              <h2>🧾 إيصال رقم: ${receipt.receiptNumber}</h2>
-              <p style="margin: 5px 0; color: #666;">${new Date(receipt.createdAt).toLocaleString('ar-EG', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}</p>
-            </div>
-            
-            <div class="row highlight">
-              <span class="label">النوع:</span>
-              <span class="value">${getTypeLabel(receipt.type)}</span>
-            </div>
-            
-            ${details.memberName || details.clientName || details.name ? `
-              <div class="row">
-                <span class="label">العميل:</span>
-                <span class="value">${details.memberName || details.clientName || details.name}</span>
-              </div>
-            ` : ''}
-            
-            ${details.phone ? `
-              <div class="row">
-                <span class="label">الهاتف:</span>
-                <span class="value">${details.phone}</span>
-              </div>
-            ` : ''}
-            
-            ${details.memberNumber ? `
-              <div class="row highlight">
-                <span class="label">رقم العضوية:</span>
-                <span class="value">#${details.memberNumber}</span>
-              </div>
-            ` : ''}
-            
-            ${details.ptNumber ? `
-              <div class="row highlight">
-                <span class="label">رقم PT:</span>
-                <span class="value">#${details.ptNumber}</span>
-              </div>
-            ` : ''}
-            
-            ${details.sessionsPurchased ? `
-              <div class="row">
-                <span class="label">عدد الجلسات:</span>
-                <span class="value">${details.sessionsPurchased} جلسة</span>
-              </div>
-            ` : ''}
-            
-            ${details.coachName ? `
-              <div class="row">
-                <span class="label">المدرب:</span>
-                <span class="value">${details.coachName}</span>
-              </div>
-            ` : ''}
-            
-            ${details.subscriptionMonths ? `
-              <div class="row">
-                <span class="label">مدة الاشتراك:</span>
-                <span class="value">${details.subscriptionMonths} شهر</span>
-              </div>
-            ` : ''}
-            
-            <div class="row">
-              <span class="label">طريقة الدفع:</span>
-              <span class="value">${getPaymentMethodLabel(receipt.paymentMethod)}</span>
-            </div>
-            
-            ${receipt.staffName ? `
-              <div class="row">
-                <span class="label">الموظف:</span>
-                <span class="value">${receipt.staffName}</span>
-              </div>
-            ` : ''}
-            
-            <div class="total">
-              <div>المبلغ الإجمالي</div>
-              <div class="amount">${receipt.amount.toLocaleString('ar-EG')} جنيه</div>
-            </div>
-            
-            <div class="footer">
-              شكراً لثقتكم 🙏 | نتمنى لكم تجربة ممتعة 💪
-            </div>
-          </div>
-          
-          <div style="text-align: center; margin-top: 20px;">
-            <button onclick="window.print()" style="padding: 10px 30px; font-size: 16px; cursor: pointer; background: #3498db; color: white; border: none; border-radius: 5px;">
-              🖨️ طباعة
-            </button>
-          </div>
-        </body>
-        </html>
-      `)
-      printWindow.document.close()
+      // استخدام نظام الطباعة القديم من printSystem.ts
+      printReceiptFromData(
+        receipt.receiptNumber,
+        receipt.type,
+        receipt.amount,
+        details,
+        receipt.createdAt,
+        receipt.paymentMethod
+      )
     } catch (error) {
       console.error('Error printing receipt:', error)
-      printWindow.close()
       alert('❌ حدث خطأ في الطباعة')
     }
   }
