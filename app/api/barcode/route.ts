@@ -1,0 +1,24 @@
+import { NextResponse } from "next/server";
+// @ts-ignore
+import bwipjs from "bwip-js";
+
+export async function POST(req: Request) {
+  try {
+    const { text } = await req.json();
+
+    const png = await bwipjs.toBuffer({
+      bcid: "code128",
+      text,
+      scale: 3,
+      height: 10,
+      includetext: true,
+    });
+
+    const base64 = png.toString("base64");
+
+    return NextResponse.json({ barcode: `data:image/png;base64,${base64}` });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: "Failed" }, { status: 500 });
+  }
+}

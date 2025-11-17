@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { generateBarcode, sendWhatsAppMessage, prepareBarcodeMessage, downloadBarcode } from '../lib/barcodeUtils'
 
 interface BarcodeWhatsAppProps {
   memberNumber: number
@@ -14,51 +13,52 @@ export default function BarcodeWhatsApp({ memberNumber, memberName, memberPhone 
   const [barcodeImage, setBarcodeImage] = useState<string>('')
   const [loading, setLoading] = useState(false)
 
+  // توليد الباركود عن طريق API
   const handleGenerateBarcode = async () => {
     setLoading(true)
     try {
-      const barcode = await generateBarcode(memberNumber.toString())
-      setBarcodeImage(barcode)
-      setShowBarcodeModal(true)
+      const res = await fetch('/api/barcode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: memberNumber.toString() }),
+      })
+
+      const data = await res.json()
+      if (data.barcode) {
+        setBarcodeImage(data.barcode)
+        setShowBarcodeModal(true)
+      } else {
+        alert('حدث خطأ أثناء توليد الباركود')
+      }
     } catch (error) {
       console.error('Error generating barcode:', error)
-      alert('حدث خطأ في توليد الباركود')
+      alert('حدث خطأ أثناء توليد الباركود')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSendBarcode = async () => {
-    try {
-      // أولاً: توليد وتحميل الباركود
-      let imageToDownload = barcodeImage
-      
-      if (!imageToDownload) {
-        imageToDownload = await generateBarcode(memberNumber.toString())
-        setBarcodeImage(imageToDownload)
-      }
-      
-      // تحميل صورة الباركود تلقائياً
-      downloadBarcode(imageToDownload, `barcode-${memberNumber}.png`)
-      
-      // الانتظار قليلاً ثم فتح واتساب
-      setTimeout(() => {
-        const message = prepareBarcodeMessage(memberNumber, memberName)
-        sendWhatsAppMessage(memberPhone, message)
-        
-        // رسالة توضيحية للمستخدم
-        alert('✅ تم تحميل صورة الباركود!\n\n📱 سيتم فتح واتساب الآن، قم بإرفاق الصورة المحملة مع الرسالة.')
-      }, 500)
-    } catch (error) {
-      console.error('Error:', error)
-      alert('حدث خطأ أثناء معالجة الباركود')
-    }
+  const handleDownloadBarcode = () => {
+    if (!barcodeImage) return
+    const a = document.createElement('a')
+    a.href = barcodeImage
+    a.download = `barcode-${memberNumber}.png`
+    a.click()
   }
 
-  const handleDownloadBarcode = () => {
-    if (barcodeImage) {
-      downloadBarcode(barcodeImage, `barcode-${memberNumber}.png`)
-    }
+  const handleSendBarcode = () => {
+    if (!barcodeImage) return alert('يجب توليد الباركود أولاً')
+
+    handleDownloadBarcode()
+
+    setTimeout(() => {
+      const message = `Barcode العضوية #${memberNumber} للعضو ${memberName}`
+      const phone = memberPhone.replace(/\D/g, '') // تنظيف رقم الهاتف
+      const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+      window.open(url, '_blank')
+
+      alert('✅ تم تحميل صورة الباركود!\n📱 سيتم فتح واتساب الآن، قم بإرفاق الصورة المحملة مع الرسالة.')
+    }, 500)
   }
 
   return (
@@ -101,9 +101,7 @@ export default function BarcodeWhatsApp({ memberNumber, memberName, memberPhone 
         <div 
           className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4"
           style={{ zIndex: 9999 }}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setShowBarcodeModal(false)
-          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowBarcodeModal(false) }}
         >
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-between items-center mb-6">
@@ -117,16 +115,12 @@ export default function BarcodeWhatsApp({ memberNumber, memberName, memberPhone 
               </button>
             </div>
 
-            {/* معلومات العضو */}
-            <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-6">
-              <div className="text-center">
-                <p className="text-sm text-blue-600 mb-2">العضو</p>
-                <p className="text-xl font-bold text-blue-800">{memberName}</p>
-                <p className="text-3xl font-bold text-blue-600 mt-2">#{memberNumber}</p>
-              </div>
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-6 text-center">
+              <p className="text-sm text-blue-600 mb-2">العضو</p>
+              <p className="text-xl font-bold text-blue-800">{memberName}</p>
+              <p className="text-3xl font-bold text-blue-600 mt-2">#{memberNumber}</p>
             </div>
 
-            {/* الباركود */}
             <div className="bg-white border-2 border-gray-200 rounded-lg p-6 mb-6 flex justify-center">
               <img 
                 src={barcodeImage} 
@@ -135,7 +129,6 @@ export default function BarcodeWhatsApp({ memberNumber, memberName, memberPhone 
               />
             </div>
 
-            {/* الأزرار */}
             <div className="space-y-3">
               <button
                 onClick={handleDownloadBarcode}
@@ -162,19 +155,6 @@ export default function BarcodeWhatsApp({ memberNumber, memberName, memberPhone 
               >
                 إغلاق
               </button>
-            </div>
-
-            {/* ملاحظة */}
-            <div className="mt-4 bg-blue-50 border-r-4 border-blue-400 p-3 rounded-lg">
-              <p className="text-xs text-blue-800 font-semibold mb-2">
-                📱 كيفية الإرسال عبر واتساب:
-              </p>
-              <ol className="text-xs text-blue-700 space-y-1 pr-4">
-                <li>1️⃣ اضغط على "تحميل وإرسال"</li>
-                <li>2️⃣ سيتم تحميل صورة الباركود تلقائياً</li>
-                <li>3️⃣ سيفتح واتساب مع الرسالة</li>
-                <li>4️⃣ أرفق الصورة المحملة مع الرسالة</li>
-              </ol>
             </div>
           </div>
         </div>
