@@ -40,10 +40,10 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
       const today = new Date()
       
       return expiry < today 
-        ? today.toISOString().split('T')[0]
-        : expiry.toISOString().split('T')[0]
+        ? formatDateYMD(today)
+        : formatDateYMD(expiry)
     }
-    return new Date().toISOString().split('T')[0]
+    return formatDateYMD(new Date())
   }
 
   const [formData, setFormData] = useState({
@@ -58,7 +58,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
-  // جلب الكوتشات
   useEffect(() => {
     fetchCoaches()
   }, [])
@@ -92,7 +91,7 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
     
     setFormData(prev => ({ 
       ...prev, 
-      expiryDate: expiry.toISOString().split('T')[0] 
+      expiryDate: formatDateYMD(expiry)
     }))
   }
 
@@ -127,7 +126,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
       if (response.ok) {
         setMessage('✅ تم تجديد جلسات PT بنجاح!')
         
-        // طباعة الإيصال
         if (result.receipt) {
           try {
             const receiptsResponse = await fetch(`/api/receipts?ptNumber=${session.ptNumber}`)
@@ -164,7 +162,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" dir="rtl">
       <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Header */}
         <div className="bg-gradient-to-r from-green-600 to-green-700 text-white p-6 rounded-t-2xl">
           <div className="flex justify-between items-center">
             <div>
@@ -181,7 +178,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
         </div>
 
         <div className="p-6">
-          {/* معلومات الجلسة الحالية */}
           <div className="bg-green-50 border-r-4 border-green-500 p-4 rounded-lg mb-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -217,7 +213,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* قسم البيانات الأساسية */}
             <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-5">
               <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                 <span>📋</span>
@@ -225,7 +220,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
               </h3>
 
               <div className="grid grid-cols-2 gap-4">
-                {/* رقم الهاتف */}
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     رقم الهاتف
@@ -239,7 +233,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
                   />
                 </div>
 
-                {/* عدد الجلسات الجديدة */}
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     عدد الجلسات الجديدة <span className="text-red-600">*</span>
@@ -255,7 +248,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
                   />
                 </div>
 
-                {/* اسم المدرب - قائمة منسدلة */}
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     اسم المدرب <span className="text-red-600">*</span>
@@ -295,7 +287,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
                   )}
                 </div>
 
-                {/* سعر الجلسة */}
                 <div>
                   <label className="block text-sm font-medium mb-2">
                     سعر الجلسة <span className="text-red-600">*</span>
@@ -312,7 +303,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
                 </div>
               </div>
 
-              {/* عرض الإجمالي */}
               <div className="mt-4 bg-white border-2 border-blue-300 rounded-lg p-4">
                 <div className="flex justify-between items-center">
                   <span className="text-gray-600">الإجمالي:</span>
@@ -325,7 +315,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
               </div>
             </div>
 
-            {/* قسم التواريخ */}
             <div className="bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-5">
               <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                 <span>📅</span>
@@ -335,27 +324,31 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    تاريخ البداية <span className="text-red-600">*</span>
+                    تاريخ البداية <span className="text-red-600">*</span> <span className="text-xs text-gray-500">(yyyy-mm-dd)</span>
                   </label>
                   <input
-                    type="date"
+                    type="text"
                     required
                     value={formData.startDate}
                     onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                    className="w-full px-4 py-3 border-2 rounded-lg font-mono"
+                    className="w-full px-4 py-3 border-2 rounded-lg font-mono text-lg"
+                    placeholder="2025-11-18"
+                    pattern="\d{4}-\d{2}-\d{2}"
                   />
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium mb-2">
-                    تاريخ الانتهاء <span className="text-red-600">*</span>
+                    تاريخ الانتهاء <span className="text-red-600">*</span> <span className="text-xs text-gray-500">(yyyy-mm-dd)</span>
                   </label>
                   <input
-                    type="date"
+                    type="text"
                     required
                     value={formData.expiryDate}
                     onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                    className="w-full px-4 py-3 border-2 rounded-lg font-mono"
+                    className="w-full px-4 py-3 border-2 rounded-lg font-mono text-lg"
+                    placeholder="2025-12-18"
+                    pattern="\d{4}-\d{2}-\d{2}"
                   />
                 </div>
               </div>
@@ -398,7 +391,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
               )}
             </div>
 
-            {/* قسم طريقة الدفع */}
             <div className="bg-gradient-to-br from-green-50 to-blue-50 border-2 border-green-200 rounded-xl p-5">
               <PaymentMethodSelector
                 value={formData.paymentMethod}
@@ -407,7 +399,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
               />
             </div>
 
-            {/* ملخص التجديد */}
             <div className="bg-gradient-to-br from-yellow-50 to-orange-50 border-2 border-yellow-200 rounded-xl p-6">
               <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
                 <span>📊</span>
@@ -438,7 +429,6 @@ export default function PTRenewalForm({ session, onSuccess, onClose }: PTRenewal
               </div>
             </div>
 
-            {/* الأزرار */}
             <div className="flex gap-3">
               <button
                 type="submit"

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { formatDateYMD } from '../../lib/dateFormatter'
 
 interface Staff {
   id: string
@@ -42,7 +43,7 @@ export default function PTPage() {
     sessionsPurchased: 8,
     coachName: '',
     pricePerSession: 0,
-    startDate: '',
+startDate: formatDateYMD(new Date()),
     expiryDate: '',
     paymentMethod: 'cash' as 'cash' | 'visa' | 'instapay',
   })
@@ -68,7 +69,6 @@ export default function PTPage() {
     try {
       const response = await fetch('/api/staff')
       const data: Staff[] = await response.json()
-      // فلترة الكوتشات النشطين فقط
       const activeCoaches = data.filter(
         (staff) => staff.isActive && staff.position?.toLowerCase().includes('مدرب')
       )
@@ -88,7 +88,7 @@ export default function PTPage() {
       sessionsPurchased: 8,
       coachName: '',
       pricePerSession: 0,
-      startDate: '',
+startDate: formatDateYMD(new Date()),
       expiryDate: '',
       paymentMethod: 'cash',
     })
@@ -96,21 +96,19 @@ export default function PTPage() {
     setShowForm(false)
   }
 
-  // بعد fetchCoaches اللي بتنتهي بـ setCoachesLoading(false)
-// أضف الدالة دي:
+  const calculateExpiryFromMonths = (months: number) => {
+    if (!formData.startDate) return
+    
+    const start = new Date(formData.startDate)
+    const expiry = new Date(start)
+    expiry.setMonth(expiry.getMonth() + months)
+    
+    setFormData(prev => ({ 
+      ...prev, 
+      expiryDate: formatDateYMD(expiry)
+    }))
+  }
 
-const calculateExpiryFromMonths = (months: number) => {
-  if (!formData.startDate) return
-  
-  const start = new Date(formData.startDate)
-  const expiry = new Date(start)
-  expiry.setMonth(expiry.getMonth() + months)
-  
-  setFormData(prev => ({ 
-    ...prev, 
-    expiryDate: expiry.toISOString().split('T')[0] 
-  }))
-}
   const handleEdit = (session: PTSession) => {
     setFormData({
       ptNumber: session.ptNumber.toString(),
@@ -119,8 +117,8 @@ const calculateExpiryFromMonths = (months: number) => {
       sessionsPurchased: session.sessionsPurchased,
       coachName: session.coachName,
       pricePerSession: session.pricePerSession,
-      startDate: session.startDate ? new Date(session.startDate).toISOString().split('T')[0] : '',
-      expiryDate: session.expiryDate ? new Date(session.expiryDate).toISOString().split('T')[0] : '',
+      startDate: session.startDate ? formatDateYMD(session.startDate) : '',
+      expiryDate: session.expiryDate ? formatDateYMD(session.expiryDate) : '',
       paymentMethod: 'cash',
     })
     setEditingSession(session)
@@ -182,7 +180,6 @@ const calculateExpiryFromMonths = (months: number) => {
     router.push(`/pt/sessions/register?ptNumber=${session.ptNumber}`)
   }
 
-  // فلترة الجلسات حسب البحث
   const filteredSessions = sessions.filter(
     (session) =>
       session.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -191,7 +188,6 @@ const calculateExpiryFromMonths = (months: number) => {
       session.phone.includes(searchTerm)
   )
 
-  // إحصائيات
   const totalSessions = sessions.reduce((sum, s) => sum + s.sessionsPurchased, 0)
   const remainingSessions = sessions.reduce((sum, s) => sum + s.sessionsRemaining, 0)
   const activePTs = sessions.filter((s) => s.sessionsRemaining > 0).length
@@ -212,12 +208,12 @@ const calculateExpiryFromMonths = (months: number) => {
             <span>حاسبة التحصيل</span>
           </button>
           <button
-  onClick={() => router.push('/pt/sessions/history')}
-  className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-2 rounded-lg hover:from-indigo-700 hover:to-indigo-800 transition transform hover:scale-105 shadow-lg flex items-center gap-2"
->
-  <span>📊</span>
-  <span>سجل الحضور</span>
-</button>
+            onClick={() => router.push('/pt/sessions/history')}
+            className="bg-gradient-to-r from-indigo-600 to-indigo-700 text-white px-6 py-2 rounded-lg hover:from-indigo-700 hover:to-indigo-800 transition transform hover:scale-105 shadow-lg flex items-center gap-2"
+          >
+            <span>📊</span>
+            <span>سجل الحضور</span>
+          </button>
           <button
             onClick={() => {
               resetForm()
@@ -240,7 +236,6 @@ const calculateExpiryFromMonths = (months: number) => {
         </div>
       )}
 
-      {/* نموذج الإضافة/التعديل */}
       {showForm && (
         <div className="bg-white p-6 rounded-xl shadow-lg mb-6 border-2 border-blue-100">
           <h2 className="text-xl font-semibold mb-4">
@@ -249,7 +244,6 @@ const calculateExpiryFromMonths = (months: number) => {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* رقم PT */}
               <div>
                 <label className="block text-sm font-medium mb-1">
                   رقم ID <span className="text-red-600">*</span>
@@ -265,7 +259,6 @@ const calculateExpiryFromMonths = (months: number) => {
                 />
               </div>
 
-              {/* اسم العميل */}
               <div>
                 <label className="block text-sm font-medium mb-1">
                   اسم العميل <span className="text-red-600">*</span>
@@ -280,7 +273,6 @@ const calculateExpiryFromMonths = (months: number) => {
                 />
               </div>
 
-              {/* رقم الهاتف */}
               <div>
                 <label className="block text-sm font-medium mb-1">رقم الهاتف</label>
                 <input
@@ -292,7 +284,6 @@ const calculateExpiryFromMonths = (months: number) => {
                 />
               </div>
 
-              {/* اسم الكوتش - قائمة منسدلة */}
               <div>
                 <label className="block text-sm font-medium mb-1">
                   اسم الكوتش <span className="text-red-600">*</span>
@@ -312,7 +303,7 @@ const calculateExpiryFromMonths = (months: number) => {
                       placeholder="اسم الكوتش"
                     />
                     <p className="text-xs text-amber-600">
-                      ⚠️ لا يوجد كوتشات نشطين. يمكنك الإدخال يدوياً أو إضافة كوتش من صفحة الموظفين
+                      ⚠️ لا يوجد كوتشات نشطين. يمكنك الإدخال يدوياً
                     </p>
                   </div>
                 ) : (
@@ -332,7 +323,6 @@ const calculateExpiryFromMonths = (months: number) => {
                 )}
               </div>
 
-              {/* عدد الجلسات */}
               <div>
                 <label className="block text-sm font-medium mb-1">
                   عدد الجلسات <span className="text-red-600">*</span>
@@ -350,7 +340,6 @@ const calculateExpiryFromMonths = (months: number) => {
                 />
               </div>
 
-              {/* سعر الجلسة */}
               <div>
                 <label className="block text-sm font-medium mb-1">
                   سعر الجلسة (ج.م) <span className="text-red-600">*</span>
@@ -369,65 +358,69 @@ const calculateExpiryFromMonths = (months: number) => {
                 />
               </div>
 
-              {/* تاريخ البداية */}
               <div>
-                <label className="block text-sm font-medium mb-1">تاريخ البداية</label>
+                <label className="block text-sm font-medium mb-1">
+                  تاريخ البداية <span className="text-xs text-gray-500">(yyyy-mm-dd)</span>
+                </label>
                 <input
-                  type="date"
+                  type="text"
                   value={formData.startDate}
                   onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-3 py-2 border rounded-lg font-mono"
+                  placeholder="2025-11-18"
+                  pattern="\d{4}-\d{2}-\d{2}"
                 />
               </div>
 
-              {/* تاريخ الانتهاء */}
               <div>
-                <label className="block text-sm font-medium mb-1">تاريخ الانتهاء</label>
+                <label className="block text-sm font-medium mb-1">
+                  تاريخ الانتهاء <span className="text-xs text-gray-500">(yyyy-mm-dd)</span>
+                </label>
                 <input
-                  type="date"
+                  type="text"
                   value={formData.expiryDate}
                   onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg"
+                  className="w-full px-3 py-2 border rounded-lg font-mono"
+                  placeholder="2025-12-18"
+                  pattern="\d{4}-\d{2}-\d{2}"
                 />
-              </div>
-              {/* أزرار الإضافة السريعة */}
-              <div className="col-span-2">
-                <p className="text-sm font-medium mb-2">⚡ إضافة سريعة:</p>
-                <div className="flex flex-wrap gap-2">
-                  {[1, 2, 3, 6, 9, 12].map(months => (
-                    <button
-                      key={months}
-                      type="button"
-                      onClick={() => calculateExpiryFromMonths(months)}
-                      className="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-lg text-sm transition font-medium"
-                    >
-                      + {months} {months === 1 ? 'شهر' : 'أشهر'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* طريقة الدفع */}
-              <div>
-                <label className="block text-sm font-medium mb-1">طريقة الدفع</label>
-                <select
-                  value={formData.paymentMethod}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      paymentMethod: e.target.value as 'cash' | 'visa' | 'instapay',
-                    })
-                  }
-                  className="w-full px-3 py-2 border rounded-lg"
-                >
-                  <option value="cash">💵 كاش</option>
-                  <option value="visa">💳 فيزا</option>
-                  <option value="instapay">📱 انستاباي</option>
-                </select>
               </div>
             </div>
 
-            {/* عرض الإجمالي */}
+            <div>
+              <p className="text-sm font-medium mb-2">⚡ إضافة سريعة:</p>
+              <div className="flex flex-wrap gap-2">
+                {[1, 2, 3, 6, 9, 12].map(months => (
+                  <button
+                    key={months}
+                    type="button"
+                    onClick={() => calculateExpiryFromMonths(months)}
+                    className="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-lg text-sm transition font-medium"
+                  >
+                    + {months} {months === 1 ? 'شهر' : 'أشهر'}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">طريقة الدفع</label>
+              <select
+                value={formData.paymentMethod}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    paymentMethod: e.target.value as 'cash' | 'visa' | 'instapay',
+                  })
+                }
+                className="w-full px-3 py-2 border rounded-lg"
+              >
+                <option value="cash">💵 كاش</option>
+                <option value="visa">💳 فيزا</option>
+                <option value="instapay">📱 انستاباي</option>
+              </select>
+            </div>
+
             {formData.sessionsPurchased > 0 && formData.pricePerSession > 0 && (
               <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
                 <div className="flex justify-between items-center">
@@ -439,7 +432,6 @@ const calculateExpiryFromMonths = (months: number) => {
               </div>
             )}
 
-            {/* أزرار التحكم */}
             <div className="flex gap-3">
               <button
                 type="submit"
@@ -462,7 +454,6 @@ const calculateExpiryFromMonths = (months: number) => {
         </div>
       )}
 
-      {/* الإحصائيات */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg p-6 shadow-lg">
           <div className="flex items-center justify-between">
@@ -495,7 +486,6 @@ const calculateExpiryFromMonths = (months: number) => {
         </div>
       </div>
 
-      {/* البحث */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
         <input
           type="text"
@@ -506,7 +496,6 @@ const calculateExpiryFromMonths = (months: number) => {
         />
       </div>
 
-      {/* جدول الجلسات */}
       {loading ? (
         <div className="text-center py-12">جاري التحميل...</div>
       ) : (
@@ -569,25 +558,21 @@ const calculateExpiryFromMonths = (months: number) => {
                       <td className="px-4 py-3 font-bold text-green-600">
                         {(session.sessionsPurchased * session.pricePerSession).toFixed(0)} ج.م
                       </td>
-<td className="px-4 py-3">
-                        <div className="text-xs">
+                      <td className="px-4 py-3">
+                        <div className="text-xs font-mono">
                           {session.startDate && (
-                            <p>
-                              من: {new Date(session.startDate).toISOString().split('T')[0]}
-                            </p>
+                            <p>من: {formatDateYMD(session.startDate)}</p>
                           )}
                           {session.expiryDate && (
                             <p className={isExpired ? 'text-red-600 font-bold' : ''}>
-                              إلى: {new Date(session.expiryDate).toISOString().split('T')[0]}
+                              إلى: {formatDateYMD(session.expiryDate)}
                             </p>
                           )}
                           {isExpired && <p className="text-red-600 font-bold">❌ منتهية</p>}
                           {!isExpired && isExpiringSoon && (
                             <p className="text-orange-600 font-bold">⚠️ قريبة الانتهاء</p>
                           )}
-                          
                         </div>
-                        
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
@@ -604,7 +589,6 @@ const calculateExpiryFromMonths = (months: number) => {
                           >
                             🔄 تجديد
                           </button>
-
                         </div>
                       </td>
                     </tr>

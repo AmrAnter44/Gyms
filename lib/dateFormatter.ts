@@ -1,19 +1,46 @@
-// دوال تنسيق التواريخ
+// دوال تنسيق التواريخ - محدثة ومحسنة
 
 /**
- * تنسيق التاريخ بصيغة: سنة-شهر-يوم
- * مثال: 2025-01-21
+ * تنسيق التاريخ بصيغة: سنة-شهر-يوم (YYYY-MM-DD)
+ * مثال: 2025-01-21 يعني 21 يناير 2025
  */
 export function formatDateYMD(date: Date | string | null | undefined): string {
   if (!date) return '-'
   
   const d = typeof date === 'string' ? new Date(date) : date
   
-  const year = d.getFullYear()
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
+  // التأكد من صحة التاريخ
+  if (isNaN(d.getTime())) return '-'
   
+  const year = d.getFullYear()                             // السنة: 2025
+  const month = String(d.getMonth() + 1).padStart(2, '0') // الشهر: 01-12
+  const day = String(d.getDate()).padStart(2, '0')        // اليوم: 01-31
+  
+  // ✅ الترتيب الصحيح: سنة-شهر-يوم (YYYY-MM-DD)
   return `${year}-${month}-${day}`
+}
+
+/**
+ * تنسيق التاريخ مع اسم الشهر بالعربي
+ * مثال: "21 يناير 2025"
+ */
+export function formatDateArabic(date: Date | string | null | undefined): string {
+  if (!date) return '-'
+  
+  const d = typeof date === 'string' ? new Date(date) : date
+  
+  if (isNaN(d.getTime())) return '-'
+  
+  const months = [
+    'يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو',
+    'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
+  ]
+  
+  const day = d.getDate()
+  const month = months[d.getMonth()]
+  const year = d.getFullYear()
+  
+  return `${day} ${month} ${year}`
 }
 
 /**
@@ -24,6 +51,8 @@ export function formatDateYMDText(date: Date | string | null | undefined): strin
   if (!date) return '-'
   
   const d = typeof date === 'string' ? new Date(date) : date
+  
+  if (isNaN(d.getTime())) return '-'
   
   const year = d.getFullYear()
   const month = d.toLocaleDateString('ar-EG', { month: 'long' })
@@ -40,6 +69,8 @@ export function formatDateTimeYMD(date: Date | string | null | undefined): strin
   if (!date) return '-'
   
   const d = typeof date === 'string' ? new Date(date) : date
+  
+  if (isNaN(d.getTime())) return '-'
   
   const datePart = formatDateYMD(d)
   const time = d.toLocaleTimeString('ar-EG', { 
@@ -72,6 +103,7 @@ export function calculateRemainingDays(expiryDate: Date | string | null | undefi
   
   const expiry = typeof expiryDate === 'string' ? new Date(expiryDate) : expiryDate
   const today = new Date()
+  today.setHours(0, 0, 0, 0) // تصفير الوقت للحصول على عدد أيام دقيق
   
   return calculateDaysBetween(today, expiry)
 }

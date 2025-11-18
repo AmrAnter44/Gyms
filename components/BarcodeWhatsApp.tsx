@@ -54,7 +54,7 @@ export default function BarcodeWhatsApp({ memberNumber, memberName, memberPhone 
     setTimeout(() => {
       const message = `Barcode العضوية #${memberNumber} للعضو ${memberName}`
       const phone = memberPhone.replace(/\D/g, '') // تنظيف رقم الهاتف
-      const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`
+      const url = `https://wa.me/${+2 + phone}?text=${encodeURIComponent(message)}`
       window.open(url, '_blank')
 
       alert('✅ تم تحميل صورة الباركود!\n📱 سيتم فتح واتساب الآن، قم بإرفاق الصورة المحملة مع الرسالة.')

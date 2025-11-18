@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import PaymentMethodSelector from './Paymentmethodselector'
+import { calculateDaysBetween, formatDateYMD } from '../lib/dateFormatter'
 
 interface Member {
   id: string
@@ -37,7 +38,7 @@ interface Receipt {
     startDate?: string
     expiryDate?: string
     subscriptionDays?: number
-    staffName?: string // ✅ إضافة اسم الموظف
+    staffName?: string
     [key: string]: any
   }
 }
@@ -54,21 +55,17 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
   const [freePTSessions, setFreePTSessions] = useState('0')
   const [inBodyScans, setInBodyScans] = useState('0')
   const [invitations, setInvitations] = useState('0')
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0])
+  const [startDate, setStartDate] = useState(formatDateYMD(new Date()))
   const [expiryDate, setExpiryDate] = useState('')
   const [notes, setNotes] = useState(member.notes || '')
   const [paymentMethod, setPaymentMethod] = useState('cash')
-  const [staffName, setStaffName] = useState('') // ✅ إضافة اسم الموظف
+  const [staffName, setStaffName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   const calculateDays = (start: string, end: string) => {
     if (!start || !end) return 0
-    const startDate = new Date(start)
-    const endDate = new Date(end)
-    const diffTime = endDate.getTime() - startDate.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    return diffDays > 0 ? diffDays : 0
+    return calculateDaysBetween(start, end)
   }
 
   const calculateExpiryFromMonths = (months: number) => {
@@ -78,7 +75,7 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
     const expiry = new Date(start)
     expiry.setMonth(expiry.getMonth() + months)
     
-    setExpiryDate(expiry.toISOString().split('T')[0])
+    setExpiryDate(formatDateYMD(expiry))
   }
 
   const calculatePaidAmount = () => {
@@ -93,7 +90,6 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
       return
     }
 
-    // ✅ التحقق من اسم الموظف
     if (!staffName.trim()) {
       setError('⚠️ يرجى إدخال اسم الموظف')
       return
@@ -129,7 +125,7 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
           expiryDate,
           notes,
           paymentMethod,
-          staffName: staffName.trim() // ✅ إرسال اسم الموظف
+          staffName: staffName.trim()
         })
       })
 
@@ -203,9 +199,9 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
             <p className="text-blue-800">
               <strong>الدعوات الحالية:</strong> {member.invitations || 0}
             </p>
-{member.expiryDate && (
+            {member.expiryDate && (
               <p className="text-blue-800">
-                <strong>تاريخ الانتهاء السابق:</strong> {new Date(member.expiryDate).toISOString().split('T')[0]}
+                <strong>تاريخ الانتهاء السابق:</strong> {formatDateYMD(member.expiryDate)}
               </p>
             )}
           </div>
@@ -255,7 +251,6 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
                 />
               </div>
 
-              {/* ✅ اسم الموظف */}
               <div className="col-span-2">
                 <label className="block text-sm font-medium mb-2">
                   اسم الموظف <span className="text-red-600">*</span>
@@ -355,26 +350,30 @@ export default function RenewalForm({ member, onSuccess, onClose }: RenewalFormP
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  تاريخ البداية <span className="text-red-600">*</span>
+                  تاريخ البداية <span className="text-red-600">*</span> <span className="text-xs text-gray-500">(yyyy-mm-dd)</span>
                 </label>
                 <input
-                  type="date"
+                  type="text"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:border-blue-500 font-mono"
+                  className="w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:border-blue-500 font-mono text-lg"
+                  placeholder="2025-11-18"
+                  pattern="\d{4}-\d{2}-\d{2}"
                   required
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  تاريخ الانتهاء <span className="text-red-600">*</span>
+                  تاريخ الانتهاء <span className="text-red-600">*</span> <span className="text-xs text-gray-500">(yyyy-mm-dd)</span>
                 </label>
                 <input
-                  type="date"
+                  type="text"
                   value={expiryDate}
                   onChange={(e) => setExpiryDate(e.target.value)}
-                  className="w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:border-blue-500 font-mono"
+                  className="w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:border-blue-500 font-mono text-lg"
+                  placeholder="2025-12-18"
+                  pattern="\d{4}-\d{2}-\d{2}"
                   required
                 />
               </div>

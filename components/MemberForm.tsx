@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import PaymentMethodSelector from '../components/Paymentmethodselector'
-import { calculateDaysBetween } from '../lib/dateFormatter'
+import { calculateDaysBetween, formatDateYMD } from '../lib/dateFormatter'
 import { printReceiptFromData } from '../lib/printSystem'
 
 interface MemberFormProps {
@@ -27,45 +27,41 @@ export default function MemberForm({ onSuccess }: MemberFormProps) {
     subscriptionPrice: 0,
     remainingAmount: 0,
     notes: '',
-    startDate: new Date().toISOString().split('T')[0],
+    startDate: formatDateYMD(new Date()),
     expiryDate: '',
     paymentMethod: 'cash' as 'cash' | 'visa' | 'instapay' | 'wallet',
     staffName: '',
     isOther: false
   })
 
-  // جلب رقم العضوية التالي فقط عند التحميل الأول
-// جلب رقم العضوية التالي فقط عند التحميل الأول
-useEffect(() => {
-  const fetchNextNumber = async () => {
-    try {
-      const response = await fetch('/api/members/next-number')
-      const data = await response.json()
-      
-      console.log('📊 استجابة API:', data)
-      
-      if (data.nextNumber !== undefined && data.nextNumber !== null) {
-        setNextMemberNumber(data.nextNumber)
-        setFormData(prev => ({ ...prev, memberNumber: data.nextNumber.toString() }))
-      } else {
-        // استخدام رقم افتراضي
-        console.warn('⚠️ لم يتم إرجاع nextNumber، استخدام 1001')
+  useEffect(() => {
+    const fetchNextNumber = async () => {
+      try {
+        const response = await fetch('/api/members/next-number')
+        const data = await response.json()
+        
+        console.log('📊 استجابة API:', data)
+        
+        if (data.nextNumber !== undefined && data.nextNumber !== null) {
+          setNextMemberNumber(data.nextNumber)
+          setFormData(prev => ({ ...prev, memberNumber: data.nextNumber.toString() }))
+        } else {
+          console.warn('⚠️ لم يتم إرجاع nextNumber، استخدام 1001')
+          setNextMemberNumber(1001)
+          setFormData(prev => ({ ...prev, memberNumber: '1001' }))
+        }
+      } catch (error) {
+        console.error('❌ خطأ في جلب رقم العضوية:', error)
         setNextMemberNumber(1001)
         setFormData(prev => ({ ...prev, memberNumber: '1001' }))
+        setMessage('⚠️ تعذر جلب رقم العضوية التالي، سيتم استخدام 1001')
+        setTimeout(() => setMessage(''), 3000)
       }
-    } catch (error) {
-      console.error('❌ خطأ في جلب رقم العضوية:', error)
-      // استخدام رقم افتراضي في حالة الخطأ
-      setNextMemberNumber(1001)
-      setFormData(prev => ({ ...prev, memberNumber: '1001' }))
-      setMessage('⚠️ تعذر جلب رقم العضوية التالي، سيتم استخدام 1001')
-      setTimeout(() => setMessage(''), 3000)
     }
-  }
-  
-  fetchNextNumber()
-}, [])
-  // ✅ معالجة تغيير تشيك بوكس Other
+    
+    fetchNextNumber()
+  }, [])
+
   const handleOtherChange = (checked: boolean) => {
     console.log('🔄 تغيير Other:', checked)
     setFormData(prev => ({
@@ -115,7 +111,7 @@ useEffect(() => {
     
     setFormData(prev => ({ 
       ...prev, 
-      expiryDate: expiry.toISOString().split('T')[0] 
+      expiryDate: formatDateYMD(expiry)
     }))
   }
 
@@ -129,7 +125,6 @@ useEffect(() => {
     setLoading(true)
     setMessage('')
 
-    // ✅ التحقق من اسم الموظف
     if (!formData.staffName.trim()) {
       setMessage('❌ يرجى إدخال اسم الموظف')
       setLoading(false)
@@ -147,12 +142,9 @@ useEffect(() => {
       }
     }
 
-    // ✅ تحويل كل الأرقام لـ integers
     const cleanedData = {
       ...formData,
-      // ✅ إرسال isOther بشكل صريح
       isOther: formData.isOther,
-      // ✅ إذا كان Other، لا نرسل memberNumber أصلاً، وإلا نحوله لـ integer
       memberNumber: formData.isOther 
         ? null 
         : (formData.memberNumber ? parseInt(formData.memberNumber) : nextMemberNumber),
@@ -181,20 +173,16 @@ useEffect(() => {
       if (response.ok) {
         setMessage('✅ تم إضافة العضو بنجاح!')
         
-        // ✅ استخدام printSystem الموحد
         if (data.receipt) {
           console.log('🖨️ طباعة الإيصال باستخدام النظام الموحد...')
           
           setTimeout(() => {
-            // حساب عدد الأيام
             const subscriptionDays = formData.startDate && formData.expiryDate 
               ? calculateDaysBetween(formData.startDate, formData.expiryDate)
               : null
 
-            // حساب المبلغ المدفوع
             const paidAmount = cleanedData.subscriptionPrice - cleanedData.remainingAmount
 
-            // إعداد تفاصيل الإيصال
             const receiptDetails = {
               memberNumber: data.member.memberNumber,
               memberName: data.member.name,
@@ -212,7 +200,6 @@ useEffect(() => {
               staffName: formData.staffName
             }
 
-            // طباعة الإيصال
             printReceiptFromData(
               data.receipt.receiptNumber,
               'Member',
@@ -239,8 +226,6 @@ useEffect(() => {
   }
 
   const duration = calculateDuration()
-
-  // ✅ حساب المبلغ المدفوع (integers فقط)
   const paidAmount = formData.subscriptionPrice - formData.remainingAmount
 
   return (
@@ -259,7 +244,6 @@ useEffect(() => {
           <span>المعلومات الأساسية</span>
         </h3>
 
-        {/* ✅ رقم العضوية مع تشيك بوكس Other */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-2">
             <label className="block text-sm font-medium">
@@ -325,7 +309,6 @@ useEffect(() => {
           </div>
         </div>
 
-        {/* ✅ حقل اسم الموظف */}
         <div className="mt-4">
           <label className="block text-sm font-medium mb-1">اسم الموظف *</label>
           <input
@@ -342,7 +325,6 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* صورة البروفايل */}
       <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-4">
         <h3 className="font-bold text-lg mb-4 flex items-center gap-2">
           <span>📷</span>
@@ -403,25 +385,29 @@ useEffect(() => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium mb-1">
-              تاريخ البداية
+              تاريخ البداية <span className="text-xs text-gray-500">(yyyy-mm-dd)</span>
             </label>
             <input
-              type="date"
+              type="text"
               value={formData.startDate}
               onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-              className="w-full px-3 py-2 border-2 rounded-lg font-mono"
+              className="w-full px-3 py-2 border-2 rounded-lg font-mono text-lg"
+              placeholder="2025-11-18"
+              pattern="\d{4}-\d{2}-\d{2}"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">
-              تاريخ الانتهاء
+              تاريخ الانتهاء <span className="text-xs text-gray-500">(yyyy-mm-dd)</span>
             </label>
             <input
-              type="date"
+              type="text"
               value={formData.expiryDate}
               onChange={(e) => setFormData({ ...formData, expiryDate: e.target.value })}
-              className="w-full px-3 py-2 border-2 rounded-lg font-mono"
+              className="w-full px-3 py-2 border-2 rounded-lg font-mono text-lg"
+              placeholder="2025-12-18"
+              pattern="\d{4}-\d{2}-\d{2}"
             />
           </div>
         </div>
