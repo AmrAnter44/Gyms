@@ -6,7 +6,8 @@
       "Bash(DATABASE_URL=\"file:./prisma/gym.db\" npx prisma db push:*)",
       "Bash(node create-admin.js:*)",
       "Bash(DATABASE_URL=\"file:./prisma/gym.db\" node:*)",
-      "Bash(taskkill:*)"
+      "Bash(taskkill:*)",
+      "Bash(mkdir:*)"
     ],
     "deny": [],
     "ask": []
