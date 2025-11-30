@@ -1,13 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cat:*)",
-      "Bash(npx prisma:*)",
-      "Bash(DATABASE_URL=\"file:./prisma/gym.db\" npx prisma db push:*)",
-      "Bash(node create-admin.js:*)",
       "Bash(DATABASE_URL=\"file:./prisma/gym.db\" node:*)",
-      "Bash(taskkill:*)",
-      "Bash(mkdir:*)"
+      "Bash(npx prisma migrate dev:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(node prisma/seedOffers.js:*)"
     ],
     "deny": [],
     "ask": []
