@@ -5,7 +5,14 @@
       "Bash(npx prisma migrate dev:*)",
       "Bash(npx prisma db push:*)",
       "Bash(npx prisma generate:*)",
-      "Bash(node prisma/seedOffers.js:*)"
+      "Bash(node prisma/seedOffers.js:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(node prisma/migrations-manual/update-staffcode.js:*)",
+      "Bash(node:*)",
+      "Bash(git checkout:*)",
+      "Bash(del check-staff-codes.js)"
     ],
     "deny": [],
     "ask": []
